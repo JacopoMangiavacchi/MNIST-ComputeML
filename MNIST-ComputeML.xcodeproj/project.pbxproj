@@ -15,6 +15,15 @@
 		EA9192B324A8B0F700D8F292 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA91928824A8B0F600D8F292 /* ContentView.swift */; };
 		EA9192B424A8B0F700D8F292 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EA91928924A8B0F600D8F292 /* Assets.xcassets */; };
 		EA9192B524A8B0F700D8F292 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EA91928924A8B0F600D8F292 /* Assets.xcassets */; };
+		EA9192C524A8B28100D8F292 /* MNIST.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA9192C424A8B28100D8F292 /* MNIST.swift */; };
+		EA9192C624A8B28100D8F292 /* MNIST.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA9192C424A8B28100D8F292 /* MNIST.swift */; };
+		EA9192C824A8B35A00D8F292 /* DrawView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA9192C724A8B35A00D8F292 /* DrawView.swift */; };
+		EA9192C924A8B35A00D8F292 /* DrawView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA9192C724A8B35A00D8F292 /* DrawView.swift */; };
+		EA9192CC24A8B46D00D8F292 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EA9192CB24A8B46D00D8F292 /* UIKit.framework */; };
+		EA9192D324A8BA4100D8F292 /* mnist_train.csv in Resources */ = {isa = PBXBuildFile; fileRef = EA9192D124A8BA4100D8F292 /* mnist_train.csv */; };
+		EA9192D424A8BA4100D8F292 /* mnist_test.csv in Resources */ = {isa = PBXBuildFile; fileRef = EA9192D224A8BA4100D8F292 /* mnist_test.csv */; };
+		EA9192D524A8BA5300D8F292 /* mnist_train.csv in Resources */ = {isa = PBXBuildFile; fileRef = EA9192D124A8BA4100D8F292 /* mnist_train.csv */; };
+		EA9192D624A8BA5600D8F292 /* mnist_test.csv in Resources */ = {isa = PBXBuildFile; fileRef = EA9192D224A8BA4100D8F292 /* mnist_test.csv */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -49,6 +58,12 @@
 		EA9192A924A8B0F700D8F292 /* Tests macOS.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Tests macOS.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		EA9192AD24A8B0F700D8F292 /* Tests_macOS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests_macOS.swift; sourceTree = "<group>"; };
 		EA9192AF24A8B0F700D8F292 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		EA9192C424A8B28100D8F292 /* MNIST.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MNIST.swift; sourceTree = "<group>"; };
+		EA9192C724A8B35A00D8F292 /* DrawView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawView.swift; sourceTree = "<group>"; };
+		EA9192CB24A8B46D00D8F292 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS14.0.sdk/System/Library/Frameworks/UIKit.framework; sourceTree = DEVELOPER_DIR; };
+		EA9192CD24A8B57C00D8F292 /* MNIST-ComputeML.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "MNIST-ComputeML.entitlements"; sourceTree = "<group>"; };
+		EA9192D124A8BA4100D8F292 /* mnist_train.csv */ = {isa = PBXFileReference; lastKnownFileType = text; name = mnist_train.csv; path = Data/mnist_train.csv; sourceTree = "<group>"; };
+		EA9192D224A8BA4100D8F292 /* mnist_test.csv */ = {isa = PBXFileReference; lastKnownFileType = text; name = mnist_test.csv; path = Data/mnist_test.csv; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -56,6 +71,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EA9192CC24A8B46D00D8F292 /* UIKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -86,12 +102,15 @@
 		EA91928124A8B0F500D8F292 = {
 			isa = PBXGroup;
 			children = (
+				EA9192D224A8BA4100D8F292 /* mnist_test.csv */,
+				EA9192D124A8BA4100D8F292 /* mnist_train.csv */,
 				EA91928624A8B0F600D8F292 /* Shared */,
 				EA91929024A8B0F700D8F292 /* iOS */,
 				EA91929724A8B0F700D8F292 /* macOS */,
 				EA9192A124A8B0F700D8F292 /* Tests iOS */,
 				EA9192AC24A8B0F700D8F292 /* Tests macOS */,
 				EA91928F24A8B0F700D8F292 /* Products */,
+				EA9192CA24A8B46C00D8F292 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -99,6 +118,8 @@
 			isa = PBXGroup;
 			children = (
 				EA91928724A8B0F600D8F292 /* MNIST_ComputeMLApp.swift */,
+				EA9192C424A8B28100D8F292 /* MNIST.swift */,
+				EA9192C724A8B35A00D8F292 /* DrawView.swift */,
 				EA91928824A8B0F600D8F292 /* ContentView.swift */,
 				EA91928924A8B0F600D8F292 /* Assets.xcassets */,
 			);
@@ -119,6 +140,7 @@
 		EA91929024A8B0F700D8F292 /* iOS */ = {
 			isa = PBXGroup;
 			children = (
+				EA9192CD24A8B57C00D8F292 /* MNIST-ComputeML.entitlements */,
 				EA91929124A8B0F700D8F292 /* Info.plist */,
 			);
 			path = iOS;
@@ -149,6 +171,14 @@
 				EA9192AF24A8B0F700D8F292 /* Info.plist */,
 			);
 			path = "Tests macOS";
+			sourceTree = "<group>";
+		};
+		EA9192CA24A8B46C00D8F292 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				EA9192CB24A8B46D00D8F292 /* UIKit.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -276,6 +306,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				EA9192B424A8B0F700D8F292 /* Assets.xcassets in Resources */,
+				EA9192D524A8BA5300D8F292 /* mnist_train.csv in Resources */,
+				EA9192D624A8BA5600D8F292 /* mnist_test.csv in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -283,6 +315,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EA9192D324A8BA4100D8F292 /* mnist_train.csv in Resources */,
+				EA9192D424A8BA4100D8F292 /* mnist_test.csv in Resources */,
 				EA9192B524A8B0F700D8F292 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -309,6 +343,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				EA9192B224A8B0F700D8F292 /* ContentView.swift in Sources */,
+				EA9192C524A8B28100D8F292 /* MNIST.swift in Sources */,
+				EA9192C824A8B35A00D8F292 /* DrawView.swift in Sources */,
 				EA9192B024A8B0F700D8F292 /* MNIST_ComputeMLApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -318,6 +354,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				EA9192B324A8B0F700D8F292 /* ContentView.swift in Sources */,
+				EA9192C624A8B28100D8F292 /* MNIST.swift in Sources */,
+				EA9192C924A8B35A00D8F292 /* DrawView.swift in Sources */,
 				EA9192B124A8B0F700D8F292 /* MNIST_ComputeMLApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -470,6 +508,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "iOS/MNIST-ComputeML.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = SV6W498A95;
 				ENABLE_PREVIEWS = YES;
@@ -482,6 +521,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "com.jacopomangiavacchi.MNIST-ComputeML";
 				PRODUCT_NAME = "MNIST-ComputeML";
 				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -492,6 +532,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "iOS/MNIST-ComputeML.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = SV6W498A95;
 				ENABLE_PREVIEWS = YES;
@@ -504,6 +545,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "com.jacopomangiavacchi.MNIST-ComputeML";
 				PRODUCT_NAME = "MNIST-ComputeML";
 				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
