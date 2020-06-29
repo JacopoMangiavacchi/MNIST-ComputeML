@@ -38,7 +38,7 @@ struct ContentView: View {
                         HStack {
                             Text("Training: \(self.mnist.trainingBatchStatus.description)")
                             if self.isDataReady(for: self.mnist.trainingBatchStatus) {
-                                Text(" \(self.mnist.trainingBatchProvider!.count) samples")
+                                Text(" \(self.mnist.trainingBatchProviderXTensor!.descriptor.shape.description) samples")
                             }
                             Spacer()
                             Button(action: {
@@ -50,7 +50,7 @@ struct ContentView: View {
                         HStack {
                             Text("Validation: \(self.mnist.predictionBatchStatus.description)")
                             if self.isDataReady(for: self.mnist.predictionBatchStatus) {
-                                Text(" \(self.mnist.predictionBatchProvider!.count) samples")
+                                Text(" \(self.mnist.predictionBatchProviderXTensor!.descriptor.shape.description) samples")
                             }
                             Spacer()
                             Button(action: {
@@ -71,58 +71,58 @@ struct ContentView: View {
 //                                Text("Start")
 //                            }.disabled(!self.isDataReady(for: self.mnist.trainingBatchStatus))
 //                        }
-                        HStack {
-                            Text("Compile model")
-                            Spacer()
-                            Button(action: {
-                                self.mnist.compileModel()
-                            }) {
-                                Text("Start")
-                            }.disabled(!self.mnist.modelPrepared)
-                        }
-                        HStack {
-                            Text(self.mnist.modelStatus)
-                            Spacer()
-                            Button(action: {
-                                self.mnist.trainModel()
-                            }) {
-                                Text("Start")
-                            }.disabled(!self.mnist.modelCompiled)
-                        }
+//                        HStack {
+//                            Text("Compile model")
+//                            Spacer()
+//                            Button(action: {
+//                                self.mnist.compileModel()
+//                            }) {
+//                                Text("Start")
+//                            }.disabled(!self.mnist.modelPrepared)
+//                        }
+//                        HStack {
+//                            Text(self.mnist.modelStatus)
+//                            Spacer()
+//                            Button(action: {
+//                                self.mnist.trainModel()
+//                            }) {
+//                                Text("Start")
+//                            }.disabled(!self.mnist.modelCompiled)
+//                        }
                     }
-                    Section(header: Text("Validation")) {
-                        HStack {
-                            Text("Predict Test data")
-                            Spacer()
-                            Button(action: {
-                                self.mnist.testModel()
-                            }) {
-                                Text("Start")
-                            }.disabled(!self.isDataReady(for: self.mnist.predictionBatchStatus) || !self.mnist.modelTrained)
-                        }
-                        Text(self.mnist.accuracy)
-                    }
-                    Section(header: Text("Test")) {
-                        HStack {
-                            Button(action: {}) {
-                                Text("Clear")
-                            }.onTapGesture {
-                                self.prediction = "-"
-                                self.drawData.lines.removeAll()
-                            }
-                            Spacer()
-                            Text(self.prediction)
-                            Spacer()
-                            Button(action: {}) {
-                                Text("Predict")
-                            }
-                                .disabled(!self.mnist.modelTrained)
-                                .onTapGesture {
-                                    let data = self.drawData.view.getImageData()
-                                    self.prediction = "\(self.mnist.predict(data: data))"
-                                }
-                        }
-                    }
+//                    Section(header: Text("Validation")) {
+//                        HStack {
+//                            Text("Predict Test data")
+//                            Spacer()
+//                            Button(action: {
+//                                self.mnist.testModel()
+//                            }) {
+//                                Text("Start")
+//                            }.disabled(!self.isDataReady(for: self.mnist.predictionBatchStatus) || !self.mnist.modelTrained)
+//                        }
+//                        Text(self.mnist.accuracy)
+//                    }
+//                    Section(header: Text("Test")) {
+//                        HStack {
+//                            Button(action: {}) {
+//                                Text("Clear")
+//                            }.onTapGesture {
+//                                self.prediction = "-"
+//                                self.drawData.lines.removeAll()
+//                            }
+//                            Spacer()
+//                            Text(self.prediction)
+//                            Spacer()
+//                            Button(action: {}) {
+//                                Text("Predict")
+//                            }
+//                                .disabled(!self.mnist.modelTrained)
+//                                .onTapGesture {
+//                                    let data = self.drawData.view.getImageData()
+//                                    self.prediction = "\(self.mnist.predict(data: data))"
+//                                }
+//                        }
+//                    }
                 }.frame(width: geometry.size.width, height: geometry.size.height - (geometry.size.height * self.splitRatio))
                 
                 Draw()
