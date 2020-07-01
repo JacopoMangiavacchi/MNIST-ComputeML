@@ -10,6 +10,9 @@ import Foundation
 import MLCompute
 
 public class MNIST : ObservableObject {
+    let imageSize = 28*28
+    let concurrentQueue = DispatchQueue(label: "MNIST.concurrent.queue", attributes: .concurrent)
+
     public enum BatchPreparationStatus {
         case notPrepared
         case preparing(count: Int)
@@ -40,6 +43,7 @@ public class MNIST : ObservableObject {
     @Published public var accuracy = "Accuracy: n/a"
     @Published public var epoch: Int = 5
 
+    
 //    var coreMLModelUrl: URL
 //    var coreMLCompiledModelUrl: URL?
 //    var model: MLModel?
@@ -52,33 +56,30 @@ public class MNIST : ObservableObject {
 //    }
     
     public func readDataSet(fileName: String, updateStatus: (Int) -> Void) -> (MLCTensor, MLCTensor) {
-        var X = [[Float]]()
-        var Y = [[Int64]]()
-        
         var count = 0
-        errno = 0
-        let trainFilePath = Bundle.main.url(forResource: fileName, withExtension: "csv")!
-        if freopen(trainFilePath.path, "r", stdin) == nil {
-            print("error opening file")
+        var X = [Float]()
+        var Y = [Int64]()
+
+        guard let filePath = Bundle.main.path(forResource: fileName, ofType: "csv") else {
+            fatalError("CSV file not found")
         }
-        
-        while let line = readLine()?.split(separator: ",") {
-            var x = Array<Float>(repeating: 0, count: 28*28)
+        do {
+            let content = try String(contentsOfFile: filePath)
+            for line in content.split(whereSeparator: \.isNewline) {
+                let sample = line.split(separator: ",").compactMap({Int64(String($0))})
+                Y.append(sample[0])
+                X.append(contentsOf: sample[1...imageSize].map{Float($0) / Float(255.0)})
 
-            for i in 0..<28*28 {
-                x[i] = Float(String(line[i + 1]))! / Float(255.0)
+                count += 1
+                updateStatus(count)
             }
-
-            X.append(x)
-            Y.append([Int64(String(line[0]))!])
-
-            count += 1
-            updateStatus(count)
+        } catch {
+            fatalError("Error reading CSV")
         }
         
         let xData = X.withUnsafeBufferPointer { pointer in
             MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!,
-                          length: pointer.count * MemoryLayout<Float>.size * 28*28)
+                          length: pointer.count * MemoryLayout<Float>.size * imageSize)
         }
 
         let yData = Y.withUnsafeBufferPointer { pointer in
@@ -86,10 +87,10 @@ public class MNIST : ObservableObject {
                           length: pointer.count * MemoryLayout<Int>.size)
         }
 
-        let xTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [X.count, 28*28], dataType: .float32)!,
+        let xTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [count, imageSize], dataType: .float32)!,
                                 data: xData)
 
-        let yTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [Y.count, 1], dataType: .int64)!,
+        let yTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [count, 1], dataType: .int64)!,
                                 data: yData)
 
         return (xTensor, yTensor)
@@ -97,7 +98,7 @@ public class MNIST : ObservableObject {
         
     public func asyncPrepareTrainBatchProvider() {
         self.trainingBatchStatus = .preparing(count: 0)
-        DispatchQueue.global(qos: .userInitiated).async {
+        concurrentQueue.async {
             let (X, Y) = self.readDataSet(fileName: "mnist_train") { count in
                 DispatchQueue.main.async {
                     self.trainingBatchStatus = .preparing(count: count)
@@ -114,7 +115,7 @@ public class MNIST : ObservableObject {
     
     public func asyncPreparePredictionBatchProvider() {
         self.predictionBatchStatus = .preparing(count: 0)
-        DispatchQueue.global(qos: .userInitiated).async {
+        concurrentQueue.async {
             let (X, Y) = self.readDataSet(fileName: "mnist_test") { count in
                 DispatchQueue.main.async {
                     self.predictionBatchStatus = .preparing(count: count)
