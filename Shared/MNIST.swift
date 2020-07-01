@@ -136,11 +136,25 @@ public class MNIST : ObservableObject {
 //        let tensor1plus2 = graph.node(with: MLCArithmeticLayer(operation: .add), sources: [tensor1, tensor2])
 //        graph.node(with: MLCArithmeticLayer(operation: .add), sources: [tensor1plus2!, tensor3])
         
+        // DENSE LAYER
+        // -----------
+        //  INPUT SHAPE: (768, 1)
+        //  LABEL SHAPE: (10, 1)
+        //  OUTPUT SHAPE:
         let dense = graph.node(with: MLCFullyConnectedLayer(weights: MLCTensor(descriptor: MLCTensorDescriptor(shape: [6, 1], dataType: .float32)!),
                                                             biases: MLCTensor(descriptor: MLCTensorDescriptor(shape: [6, 1], dataType: .float32)!),
-                                                            descriptor: MLCConvolutionDescriptor)!,
-                               sources: <#T##[MLCTensor]#>,
-                               lossLabels: <#T##[MLCTensor]#>)
+                                                            descriptor: MLCConvolutionDescriptor(kernelSizes: (height: 6, width: 1),
+                                                                                                 inputFeatureChannelCount: 6,
+                                                                                                 outputFeatureChannelCount: 1))!,
+                               sources: [MLCTensor(descriptor: MLCTensorDescriptor(shape: [6, 1], dataType: .float32)!)],
+                               lossLabels: [MLCTensor(descriptor: MLCTensorDescriptor(shape: [6, 1], dataType: .float32)!)])
+        
+        // SOFTMAX ACTIVATION
+        // ------------------
+        graph.node(with: MLCSoftmaxLayer(operation: MLCSoftmaxOperation(rawValue: 10)!),
+                   source: dense!)
+        
+        
         
         return graph
 
