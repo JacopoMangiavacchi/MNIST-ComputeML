@@ -130,7 +130,21 @@ public class MNIST : ObservableObject {
         }
     }
     
-//    public func prepareModel() {
+    public func prepareGraph() -> MLCGraph {
+        
+        let graph = MLCGraph()
+//        let tensor1plus2 = graph.node(with: MLCArithmeticLayer(operation: .add), sources: [tensor1, tensor2])
+//        graph.node(with: MLCArithmeticLayer(operation: .add), sources: [tensor1plus2!, tensor3])
+        
+        let dense = graph.node(with: MLCFullyConnectedLayer(weights: MLCTensor(descriptor: MLCTensorDescriptor(shape: [6, 1], dataType: .float32)!),
+                                                            biases: MLCTensor(descriptor: MLCTensorDescriptor(shape: [6, 1], dataType: .float32)!),
+                                                            descriptor: MLCConvolutionDescriptor)!,
+                               sources: <#T##[MLCTensor]#>,
+                               lossLabels: <#T##[MLCTensor]#>)
+        
+        return graph
+
+        
 //        let coremlModel = Model(version: 4,
 //                                shortDescription: "MNIST-Trainable",
 //                                author: "Jacopo Mangiavacchi",
@@ -239,7 +253,7 @@ public class MNIST : ObservableObject {
 //        print(coreMLModelUrl)
 //        try! coreMLData!.write(to: coreMLModelUrl)
 //        modelPrepared = true
-//    }
+    }
     
 //    public func compileModel() {
 //        coreMLCompiledModelUrl = try! MLModel.compileModel(at: coreMLModelUrl)
