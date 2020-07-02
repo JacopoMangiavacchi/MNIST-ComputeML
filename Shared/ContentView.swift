@@ -62,15 +62,15 @@ struct ContentView: View {
                     }
                     Section(header: Text("Training")) {
                         Stepper(value: self.$mnist.epoch, in: 1...10, label: { Text("Epoch:  \(self.mnist.epoch)")})
-//                        HStack {
-//                            Text("Prepare model")
-//                            Spacer()
-//                            Button(action: {
-//                                self.mnist.prepareModel()
-//                            }) {
-//                                Text("Start")
-//                            }.disabled(!self.isDataReady(for: self.mnist.trainingBatchStatus))
-//                        }
+                        HStack {
+                            Text("Prepare model")
+                            Spacer()
+                            Button(action: {
+                                self.mnist.prepareGraph()
+                            }) {
+                                Text("Start")
+                            }//.disabled(!self.isDataReady(for: self.mnist.trainingBatchStatus))
+                        }
 //                        HStack {
 //                            Text("Compile model")
 //                            Spacer()

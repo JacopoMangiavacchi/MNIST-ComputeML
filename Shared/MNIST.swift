@@ -130,34 +130,53 @@ public class MNIST : ObservableObject {
         }
     }
     
-    public func prepareGraph() -> MLCGraph {
-        
+    public func prepareGraph() {
+        // MODEL
+        // -----
+        // model = keras.Sequential([
+        //     keras.layers.Dense(128, activation='relu'),  // W (784, 128)  B (128,)
+        //     keras.layers.Dense(10)                       // W (128, 10)   B (10,)
+        // ])
+
         let graph = MLCGraph()
-//        let tensor1plus2 = graph.node(with: MLCArithmeticLayer(operation: .add), sources: [tensor1, tensor2])
-//        graph.node(with: MLCArithmeticLayer(operation: .add), sources: [tensor1plus2!, tensor3])
         
         // DENSE LAYER
         // -----------
-        //  INPUT SHAPE: (768, 1)
+        //  INPUT SHAPE: (784, 1)
         //  LABEL SHAPE: (10, 1)
-        //  OUTPUT SHAPE:
-        let dense = graph.node(with: MLCFullyConnectedLayer(weights: MLCTensor(descriptor: MLCTensorDescriptor(shape: [6, 1], dataType: .float32)!),
-                                                            biases: MLCTensor(descriptor: MLCTensorDescriptor(shape: [6, 1], dataType: .float32)!),
-                                                            descriptor: MLCConvolutionDescriptor(kernelSizes: (height: 6, width: 1),
-                                                                                                 inputFeatureChannelCount: 6,
-                                                                                                 outputFeatureChannelCount: 1))!,
-                               sources: [MLCTensor(descriptor: MLCTensorDescriptor(shape: [6, 1], dataType: .float32)!)],
-                               lossLabels: [MLCTensor(descriptor: MLCTensorDescriptor(shape: [6, 1], dataType: .float32)!)])
+        //  OUTPUT SHAPE: (128, 1)
+        //  NB Weights and Bias have to be 4d shaped
+        let dense1 = graph.node(with: MLCFullyConnectedLayer(weights: MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 784*128, 1, 1], dataType: .float32)!,
+                                                                                randomInitializerType: .glorotUniform),
+                                                            biases: MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 128, 1, 1], dataType: .float32)!,
+                                                                              randomInitializerType: .glorotUniform),
+                                                            descriptor: MLCConvolutionDescriptor(kernelSizes: (height: 784, width: 128),
+                                                                                                 inputFeatureChannelCount: 784,
+                                                                                                 outputFeatureChannelCount: 128))!,
+                               sources: [MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 784], dataType: .float32)!)])
+        
+        // DENSE LAYER
+        // -----------
+        //  INPUT SHAPE: (128, 1)
+        //  OUTPUT SHAPE: (10, 1)
+        let dense2 = graph.node(with: MLCFullyConnectedLayer(weights: MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 128*10, 1, 1], dataType: .float32)!,
+                                                                                randomInitializerType: .glorotUniform),
+                                                            biases: MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 10, 1, 1], dataType: .float32)!,
+                                                                              randomInitializerType: .glorotUniform),
+                                                            descriptor: MLCConvolutionDescriptor(kernelSizes: (height: 128, width: 10),
+                                                                                                 inputFeatureChannelCount: 128,
+                                                                                                 outputFeatureChannelCount: 10))!,
+                               sources: [dense1!])
         
         // SOFTMAX ACTIVATION
         // ------------------
         graph.node(with: MLCSoftmaxLayer(operation: MLCSoftmaxOperation(rawValue: 10)!),
-                   source: dense!)
+                   source: dense2!)
         
         
         
-        return graph
 
+        
         
 //        let coremlModel = Model(version: 4,
 //                                shortDescription: "MNIST-Trainable",
