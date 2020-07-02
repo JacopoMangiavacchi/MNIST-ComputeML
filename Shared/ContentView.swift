@@ -16,48 +16,22 @@ struct ContentView: View {
     
     let splitRatio: CGFloat = 0.2445
     
-    func isDataReady(for status: MNIST.BatchPreparationStatus) -> Bool {
-        switch status {
-        case .ready: return true
-        default: return false
-        }
-    }
-
-    func isDataPreparing(for status: MNIST.BatchPreparationStatus) -> Bool {
-        switch status {
-        case .preparing: return true
-        default: return false
-        }
-    }
-
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 Form {
                     Section(header: Text("Dataset")) {
                         HStack {
-                            Text("Training: \(self.mnist.trainingBatchStatus.description)")
-                            if self.isDataReady(for: self.mnist.trainingBatchStatus) {
-                                Text(" \(self.mnist.trainingBatchProviderXTensor!.descriptor.shape.description) samples")
-                            }
-                            Spacer()
+                            ProgressView("Training: \(self.mnist.trainingBatchCount)", value: Float(self.mnist.trainingBatchCount), total: 60000)
+                            Spacer(minLength: 50.0)
+                            ProgressView("Test: \(self.mnist.predictionBatchCount)", value: Float(self.mnist.predictionBatchCount), total: 10000)
+                            Spacer(minLength: 100.0)
                             Button(action: {
                                 self.mnist.asyncPrepareTrainBatchProvider()
-                            }) {
-                                Text("Start")
-                            }.disabled(self.isDataPreparing(for: self.mnist.trainingBatchStatus))
-                        }
-                        HStack {
-                            Text("Validation: \(self.mnist.predictionBatchStatus.description)")
-                            if self.isDataReady(for: self.mnist.predictionBatchStatus) {
-                                Text(" \(self.mnist.predictionBatchProviderXTensor!.descriptor.shape.description) samples")
-                            }
-                            Spacer()
-                            Button(action: {
                                 self.mnist.asyncPreparePredictionBatchProvider()
                             }) {
                                 Text("Start")
-                            }.disabled(self.isDataPreparing(for: self.mnist.predictionBatchStatus))
+                            }
                         }
                     }
                     Section(header: Text("Training")) {

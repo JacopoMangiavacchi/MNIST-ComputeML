@@ -13,25 +13,8 @@ public class MNIST : ObservableObject {
     let imageSize = 28*28
     let concurrentQueue = DispatchQueue(label: "MNIST.concurrent.queue", attributes: .concurrent)
 
-    public enum BatchPreparationStatus {
-        case notPrepared
-        case preparing(count: Int)
-        case ready
-        
-        var description: String {
-            switch self {
-            case .notPrepared:
-                return "Not Prepared"
-            case .preparing(let count):
-                return "Preparing \(count)"
-            case .ready:
-                return "Ready"
-            }
-        }
-    }
-    
-    @Published public var trainingBatchStatus = BatchPreparationStatus.notPrepared
-    @Published public var predictionBatchStatus = BatchPreparationStatus.notPrepared
+    @Published public var trainingBatchCount = 0
+    @Published public var predictionBatchCount = 0
     @Published public var trainingBatchProviderXTensor: MLCTensor?
     @Published public var trainingBatchProviderYTensor: MLCTensor?
     @Published public var predictionBatchProviderXTensor: MLCTensor?
@@ -63,18 +46,29 @@ public class MNIST : ObservableObject {
         guard let filePath = Bundle.main.path(forResource: fileName, ofType: "csv") else {
             fatalError("CSV file not found")
         }
-        do {
-            let content = try String(contentsOfFile: filePath)
-            for line in content.split(whereSeparator: \.isNewline) {
-                let sample = line.split(separator: ",").compactMap({Int64(String($0))})
-                Y.append(sample[0])
-                X.append(contentsOf: sample[1...imageSize].map{Float($0) / Float(255.0)})
+        guard let filePointer:UnsafeMutablePointer<FILE> = fopen(filePath,"r") else {
+            preconditionFailure("Could not open file at \(filePath)")
+        }
 
-                count += 1
-                updateStatus(count)
-            }
-        } catch {
-            fatalError("Error reading CSV")
+        var lineByteArrayPointer: UnsafeMutablePointer<CChar>? = nil
+        var lineCap: Int = 0
+        var bytesRead = getline(&lineByteArrayPointer, &lineCap, filePointer)
+
+        defer {
+            fclose(filePointer)
+        }
+
+        while (bytesRead > 0) {
+            let line = String.init(cString:lineByteArrayPointer!).trimmingCharacters(in: .whitespacesAndNewlines)
+
+            let sample = line.split(separator: ",").compactMap({Int64(String($0))})
+            Y.append(sample[0])
+            X.append(contentsOf: sample[1...imageSize].map{Float($0) / Float(255.0)})
+
+            count += 1
+            updateStatus(count)
+
+            bytesRead = getline(&lineByteArrayPointer, &lineCap, filePointer)
         }
         
         let xData = X.withUnsafeBufferPointer { pointer in
@@ -97,16 +91,16 @@ public class MNIST : ObservableObject {
     }
         
     public func asyncPrepareTrainBatchProvider() {
-        self.trainingBatchStatus = .preparing(count: 0)
+        self.trainingBatchCount = 0
         concurrentQueue.async {
             let (X, Y) = self.readDataSet(fileName: "mnist_train") { count in
                 DispatchQueue.main.async {
-                    self.trainingBatchStatus = .preparing(count: count)
+                    self.trainingBatchCount = count
                 }
             }
             
             DispatchQueue.main.async {
-                self.trainingBatchStatus = .ready
+                self.trainingBatchCount = X.descriptor.shape[0]
                 self.trainingBatchProviderXTensor = X
                 self.trainingBatchProviderYTensor = Y
             }
@@ -114,16 +108,16 @@ public class MNIST : ObservableObject {
     }
     
     public func asyncPreparePredictionBatchProvider() {
-        self.predictionBatchStatus = .preparing(count: 0)
+        self.predictionBatchCount = 0
         concurrentQueue.async {
             let (X, Y) = self.readDataSet(fileName: "mnist_test") { count in
                 DispatchQueue.main.async {
-                    self.predictionBatchStatus = .preparing(count: count)
+                    self.predictionBatchCount = count
                 }
             }
             
             DispatchQueue.main.async {
-                self.predictionBatchStatus = .ready
+                self.predictionBatchCount = X.descriptor.shape[0]
                 self.predictionBatchProviderXTensor = X
                 self.predictionBatchProviderYTensor = Y
             }
@@ -173,119 +167,43 @@ public class MNIST : ObservableObject {
         graph.node(with: MLCSoftmaxLayer(operation: MLCSoftmaxOperation(rawValue: 10)!),
                    source: dense2!)
         
+        let trainingGraph = MLCTrainingGraph(graphObjects: [graph],
+                                             lossLayer: MLCLossLayer(descriptor: MLCLossDescriptor(type: .softmaxCrossEntropy,
+                                                                                                   reductionType: .none)),
+                                             optimizer: MLCOptimizer(descriptor: MLCOptimizerDescriptor(learningRate: 0.1,
+                                                                                                        gradientRescale: 0.1,
+                                                                                                        regularizationType: .none,
+                                                                                                        regularizationScale: 0.0)))
+        
+//        trainingGraph.addInputs(<#T##inputs: [String : MLCTensor]##[String : MLCTensor]#>,
+//                                lossLabels: <#T##[String : MLCTensor]?#>)
         
         
+        print(trainingGraph)
+        
+//        let i = MLCInferenceGraph(graphObjects: [g])
+//        i.addInputs(["data1" : tensor1, "data2" : tensor2, "data3" : tensor3])
+//        i.compile(options: .debugLayers, device: MLCDevice())
+//
+//        i.execute(inputsData: ["data1" : data1, "data2" : data2, "data3" : data3],
+//                  batchSize: 0,
+//                  options: []) { (r, e, time) in
+//            print("Error: \(String(describing: e))")
+//            print("Result: \(String(describing: r))")
+//
+//            let buffer3 = UnsafeMutableRawPointer.allocate(byteCount: 6 * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
+//
+//            r!.copyDataFromDeviceMemory(toBytes: buffer3, length: 6 * MemoryLayout<Float>.size, synchronizeWithDevice: false)
+//
+//            let float4Ptr = buffer3.bindMemory(to: Float.self, capacity: 6)
+//            let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: 6)
+//            print(Array(float4Buffer))
+//
+//            page.finishExecution()
+//        }
 
         
-        
-//        let coremlModel = Model(version: 4,
-//                                shortDescription: "MNIST-Trainable",
-//                                author: "Jacopo Mangiavacchi",
-//                                license: "MIT",
-//                                userDefined: ["SwiftCoremltoolsVersion" : "0.0.12"]) {
-//            Input(name: "image", shape: [1, 28, 28])
-//            Output(name: "output", shape: [10], featureType: .float)
-//            TrainingInput(name: "image", shape: [1, 28, 28])
-//            TrainingInput(name: "output_true", shape: [1], featureType: .int)
-//            NeuralNetwork(losses: [CategoricalCrossEntropy(name: "lossLayer",
-//                                       input: "output",
-//                                       target: "output_true")],
-//                          optimizer: Adam(learningRateDefault: 0.0001,
-//                                         learningRateMax: 0.3,
-//                                         miniBatchSizeDefault: 128,
-//                                         miniBatchSizeRange: [128],
-//                                         beta1Default: 0.9,
-//                                         beta1Max: 1.0,
-//                                         beta2Default: 0.999,
-//                                         beta2Max: 1.0,
-//                                         epsDefault: 0.00000001,
-//                                         epsMax: 0.00000001),
-//                          epochDefault: UInt(self.epoch),
-//                          epochSet: [UInt(self.epoch)],
-//                          shuffle: true) {
-//                Convolution(name: "conv1",
-//                             input: ["image"],
-//                             output: ["outConv1"],
-//                             outputChannels: 32,
-//                             kernelChannels: 1,
-//                             nGroups: 1,
-//                             kernelSize: [3, 3],
-//                             stride: [1, 1],
-//                             dilationFactor: [1, 1],
-//                             paddingType: .valid(borderAmounts: [EdgeSizes(startEdgeSize: 0, endEdgeSize: 0),
-//                                                                 EdgeSizes(startEdgeSize: 0, endEdgeSize: 0)]),
-//                             outputShape: [],
-//                             deconvolution: false,
-//                             updatable: true)
-//                ReLu(name: "relu1",
-//                     input: ["outConv1"],
-//                     output: ["outRelu1"])
-//                Pooling(name: "pooling1",
-//                             input: ["outRelu1"],
-//                             output: ["outPooling1"],
-//                             poolingType: .max,
-//                             kernelSize: [2, 2],
-//                             stride: [2, 2],
-//                             paddingType: .valid(borderAmounts: [EdgeSizes(startEdgeSize: 0, endEdgeSize: 0),
-//                                                                 EdgeSizes(startEdgeSize: 0, endEdgeSize: 0)]),
-//                             avgPoolExcludePadding: true,
-//                             globalPooling: false)
-//                Convolution(name: "conv2",
-//                             input: ["outPooling1"],
-//                             output: ["outConv2"],
-//                             outputChannels: 32,
-//                             kernelChannels: 32,
-//                             nGroups: 1,
-//                             kernelSize: [2, 2],
-//                             stride: [1, 1],
-//                             dilationFactor: [1, 1],
-//                             paddingType: .valid(borderAmounts: [EdgeSizes(startEdgeSize: 0, endEdgeSize: 0),
-//                                                                 EdgeSizes(startEdgeSize: 0, endEdgeSize: 0)]),
-//                             outputShape: [],
-//                             deconvolution: false,
-//                             updatable: true)
-//                ReLu(name: "relu2",
-//                     input: ["outConv2"],
-//                     output: ["outRelu2"])
-//                Pooling(name: "pooling2",
-//                             input: ["outRelu2"],
-//                             output: ["outPooling2"],
-//                             poolingType: .max,
-//                             kernelSize: [2, 2],
-//                             stride: [2, 2],
-//                             paddingType: .valid(borderAmounts: [EdgeSizes(startEdgeSize: 0, endEdgeSize: 0),
-//                                                                 EdgeSizes(startEdgeSize: 0, endEdgeSize: 0)]),
-//                             avgPoolExcludePadding: true,
-//                             globalPooling: false)
-//                Flatten(name: "flatten1",
-//                             input: ["outPooling2"],
-//                             output: ["outFlatten1"],
-//                             mode: .last)
-//                InnerProduct(name: "hidden1",
-//                             input: ["outFlatten1"],
-//                             output: ["outHidden1"],
-//                             inputChannels: 1152,
-//                             outputChannels: 500,
-//                             updatable: true)
-//                ReLu(name: "relu3",
-//                     input: ["outHidden1"],
-//                     output: ["outRelu3"])
-//                InnerProduct(name: "hidden2",
-//                             input: ["outRelu3"],
-//                             output: ["outHidden2"],
-//                             inputChannels: 500,
-//                             outputChannels: 10,
-//                             updatable: true)
-//                Softmax(name: "softmax",
-//                        input: ["outHidden2"],
-//                        output: ["output"])
-//            }
-//        }
-//
-//        let coreMLData = coremlModel.coreMLData
-//        print(coreMLModelUrl)
-//        try! coreMLData!.write(to: coreMLModelUrl)
-//        modelPrepared = true
+
     }
     
 //    public func compileModel() {
