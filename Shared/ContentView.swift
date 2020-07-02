@@ -14,6 +14,10 @@ struct ContentView: View {
     @ObservedObject var drawData = DrawData()
     @State var prediction = "-"
     
+    func isDataReady(trainingCount: Int, predictionCount: Int) -> Bool {
+        return trainingCount == 60000 && predictionCount == 10000
+    }
+    
     let splitRatio: CGFloat = 0.2445
     
     var body: some View {
@@ -37,23 +41,14 @@ struct ContentView: View {
                     Section(header: Text("Training")) {
                         Stepper(value: self.$mnist.epoch, in: 1...10, label: { Text("Epoch:  \(self.mnist.epoch)")})
                         HStack {
-                            Text("Prepare model")
+                            Text("Compile the model")
                             Spacer()
                             Button(action: {
                                 self.mnist.prepareGraph()
                             }) {
                                 Text("Start")
-                            }//.disabled(!self.isDataReady(for: self.mnist.trainingBatchStatus))
+                            }//.disabled(!self.isDataReady(trainingCount: self.mnist.trainingBatchCount, predictionCount: self.mnist.predictionBatchCount))
                         }
-//                        HStack {
-//                            Text("Compile model")
-//                            Spacer()
-//                            Button(action: {
-//                                self.mnist.compileModel()
-//                            }) {
-//                                Text("Start")
-//                            }.disabled(!self.mnist.modelPrepared)
-//                        }
 //                        HStack {
 //                            Text(self.mnist.modelStatus)
 //                            Spacer()
@@ -76,27 +71,27 @@ struct ContentView: View {
 //                        }
 //                        Text(self.mnist.accuracy)
 //                    }
-//                    Section(header: Text("Test")) {
-//                        HStack {
-//                            Button(action: {}) {
-//                                Text("Clear")
-//                            }.onTapGesture {
-//                                self.prediction = "-"
-//                                self.drawData.lines.removeAll()
-//                            }
-//                            Spacer()
-//                            Text(self.prediction)
-//                            Spacer()
-//                            Button(action: {}) {
-//                                Text("Predict")
-//                            }
-//                                .disabled(!self.mnist.modelTrained)
-//                                .onTapGesture {
-//                                    let data = self.drawData.view.getImageData()
-//                                    self.prediction = "\(self.mnist.predict(data: data))"
-//                                }
-//                        }
-//                    }
+                    Section(header: Text("Test")) {
+                        HStack {
+                            Button(action: {}) {
+                                Text("Clear")
+                            }.onTapGesture {
+                                self.prediction = "-"
+                                self.drawData.lines.removeAll()
+                            }
+                            Spacer()
+                            Text(self.prediction)
+                            Spacer()
+                            Button(action: {}) {
+                                Text("Predict")
+                            }
+                                .disabled(!self.mnist.modelTrained)
+                                .onTapGesture {
+                                    let data = self.drawData.view.getImageData()
+                                    // self.prediction = "\(self.mnist.predict(data: data))"
+                                }
+                        }
+                    }
                 }.frame(width: geometry.size.width, height: geometry.size.height - (geometry.size.height * self.splitRatio))
                 
                 Draw()

@@ -147,7 +147,7 @@ public class MNIST : ObservableObject {
                                                             descriptor: MLCConvolutionDescriptor(kernelSizes: (height: 784, width: 128),
                                                                                                  inputFeatureChannelCount: 784,
                                                                                                  outputFeatureChannelCount: 128))!,
-                               sources: [MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 784], dataType: .float32)!)])
+                               sources: [MLCTensor(descriptor: MLCTensorDescriptor(shape: [784, 1], dataType: .float32)!)])
         
         // DENSE LAYER
         // -----------
@@ -175,12 +175,16 @@ public class MNIST : ObservableObject {
                                                                                                         regularizationType: .none,
                                                                                                         regularizationScale: 0.0)))
         
-//        trainingGraph.addInputs(<#T##inputs: [String : MLCTensor]##[String : MLCTensor]#>,
-//                                lossLabels: <#T##[String : MLCTensor]?#>)
+        trainingGraph.addInputs(["image" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [784, 1], dataType: .float32)!)],
+                                lossLabels: ["label" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [10, 1], dataType: .int64)!)])
+
+//        print(trainingGraph)
+
+        let b = trainingGraph.compile(options: [], device: MLCDevice(type: .cpu)!)
         
+        print(b)
         
-        print(trainingGraph)
-        
+
 //        let i = MLCInferenceGraph(graphObjects: [g])
 //        i.addInputs(["data1" : tensor1, "data2" : tensor2, "data3" : tensor3])
 //        i.compile(options: .debugLayers, device: MLCDevice())
