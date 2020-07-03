@@ -25,29 +25,9 @@ public class MNIST : ObservableObject {
     @Published public var modelStatus = "Train model"
     @Published public var accuracy = "Accuracy: n/a"
     @Published public var epoch: Int = 5
-
     
-//    var coreMLModelUrl: URL
-//    var coreMLCompiledModelUrl: URL?
-//    var model: MLModel?
-//    var retrainedModel: MLModel?
-//    var predictionLabels: [Int]
-//    var trainingStartTime: Date!
-    
-//    public init() {
-//        predictionLabels = [Int]()
-//    }
-    
-    public func readDataSet(fileName: String, updateStatus: @escaping (Int) -> Void) -> (MLCTensor, MLCTensor) {
-        let serialQueue = DispatchQueue(label: "MNIST.serial.queue.\(fileName)")
-        
-        var count = 0
-        var X = [Float]()
-        var Y = [Int64]()
-
-        guard let filePath = Bundle.main.path(forResource: fileName, ofType: "csv") else {
-            fatalError("CSV file not found")
-        }
+    // Load in memory and split is not performant
+    private func processFileLines(filePath: String, process: (String) -> Void) {
         guard let filePointer:UnsafeMutablePointer<FILE> = fopen(filePath,"r") else {
             preconditionFailure("Could not open file at \(filePath)")
         }
@@ -60,17 +40,33 @@ public class MNIST : ObservableObject {
             fclose(filePointer)
         }
 
-        let iterations = 20
-        var iteration = 0
-        var iterationList = Array<Array<String>>(repeating: Array<String>(), count: iterations)
-        
         while (bytesRead > 0) {
             let line = String.init(cString:lineByteArrayPointer!).trimmingCharacters(in: .whitespacesAndNewlines)
 
-            iterationList[iteration].append(line)
-            iteration = (iteration + 1) % iterations
+            process(line)
             
             bytesRead = getline(&lineByteArrayPointer, &lineCap, filePointer)
+        }
+    }
+    
+    public func readDataSet(fileName: String, updateStatus: @escaping (Int) -> Void) -> (MLCTensor, MLCTensor) {
+        guard let filePath = Bundle.main.path(forResource: fileName, ofType: "csv") else {
+            fatalError("CSV file not found")
+        }
+
+        let serialQueue = DispatchQueue(label: "MNIST.serial.queue.\(fileName)")
+        
+        var count = 0
+        var X = [Float]()
+        var Y = [Int64]()
+        
+        let iterations = 20
+        var iteration = 0
+        var iterationList = Array<Array<String>>(repeating: Array<String>(), count: iterations)
+
+        processFileLines(filePath: filePath) { line in
+            iterationList[iteration].append(line)
+            iteration = (iteration + 1) % iterations
         }
         
         DispatchQueue.concurrentPerform(iterations: iterations) { iteration in
@@ -194,182 +190,11 @@ public class MNIST : ObservableObject {
         trainingGraph.addInputs(["image" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [784, 1], dataType: .float32)!)],
                                 lossLabels: ["label" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [10, 1], dataType: .int64)!)])
 
-//        print(trainingGraph)
-
         let b = trainingGraph.compile(options: [], device: MLCDevice(type: .cpu)!)
         
         print(b)
         
-
-//        let i = MLCInferenceGraph(graphObjects: [g])
-//        i.addInputs(["data1" : tensor1, "data2" : tensor2, "data3" : tensor3])
-//        i.compile(options: .debugLayers, device: MLCDevice())
-//
-//        i.execute(inputsData: ["data1" : data1, "data2" : data2, "data3" : data3],
-//                  batchSize: 0,
-//                  options: []) { (r, e, time) in
-//            print("Error: \(String(describing: e))")
-//            print("Result: \(String(describing: r))")
-//
-//            let buffer3 = UnsafeMutableRawPointer.allocate(byteCount: 6 * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
-//
-//            r!.copyDataFromDeviceMemory(toBytes: buffer3, length: 6 * MemoryLayout<Float>.size, synchronizeWithDevice: false)
-//
-//            let float4Ptr = buffer3.bindMemory(to: Float.self, capacity: 6)
-//            let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: 6)
-//            print(Array(float4Buffer))
-//
-//            page.finishExecution()
-//        }
-
-        
-
     }
     
-//    public func compileModel() {
-//        coreMLCompiledModelUrl = try! MLModel.compileModel(at: coreMLModelUrl)
-//        print("Compiled Model Path: \(coreMLCompiledModelUrl!)")
-//        model = try! MLModel(contentsOf: coreMLCompiledModelUrl!)
-//        modelCompiled = true
-//    }
-//
-//    public func trainModel() {
-//        self.modelTrained = false
-//        self.modelStatus = "Training starting"
-//
-//        let configuration = MLModelConfiguration()
-//        configuration.computeUnits = .all
-//        //configuration.parameters = [.epochs : 100]
-//        let progressHandler = { (context: MLUpdateContext) in
-//            switch context.event {
-//            case .trainingBegin:
-//                print("Training started..")
-//                DispatchQueue.main.async {
-//                    self.modelStatus = "Training started.."
-//                }
-//
-//            case .miniBatchEnd:
-//                break
-////                let batchIndex = context.metrics[.miniBatchIndex] as! Int
-////                let batchLoss = context.metrics[.lossValue] as! Double
-////                print("Mini batch \(batchIndex), loss: \(batchLoss)")
-//            case .epochEnd:
-//                let epochIndex = context.metrics[.epochIndex] as! Int
-//                let trainLoss = context.metrics[.lossValue] as! Double
-//                print("Epoch \(epochIndex + 1) end with loss \(trainLoss)")
-//                DispatchQueue.main.async {
-//                    self.modelStatus = "Epoch \(epochIndex) end with loss \(trainLoss)"
-//                }
-//
-//            default:
-//                print("Unknown event")
-//            }
-//
-////        print(context.model.modelDescription.parameterDescriptionsByKey)
-////        do {
-////            let multiArray = try context.model.parameterValue(for: MLParameterKey.weights.scoped(to: "dense_1")) as! MLMultiArray
-////            print(multiArray.shape)
-////        } catch {
-////            print(error)
-////        }
-//        }
-//
-//        let completionHandler = { (context: MLUpdateContext) in
-//            print("Training completed with state \(context.task.state.rawValue)")
-//            print("CoreML Error: \(context.task.error.debugDescription)")
-//            DispatchQueue.main.async {
-//                self.modelStatus = "Training completed with state \(context.task.state.rawValue)"
-//            }
-//
-//            if context.task.state != .completed {
-//                print("Failed")
-//                DispatchQueue.main.async {
-//                    self.modelStatus = "Training Failed"
-//                }
-//                return
-//            }
-//
-//            let trainLoss = context.metrics[.lossValue] as! Double
-//            print("Final loss: \(trainLoss)")
-//            DispatchQueue.main.async {
-//                self.modelStatus = "Training completed with loss: \(trainLoss) in \(Int(Date().timeIntervalSince(self.trainingStartTime))) secs"
-//                self.modelTrained = true
-//            }
-//
-//            self.retrainedModel = context.model
-//
-////            let updatedModel = context.model
-////            let updatedModelURL = URL(fileURLWithPath: retrainedCoreMLFilePath)
-////            try! updatedModel.write(to: updatedModelURL)
-//            print("Model Trained!")
-//        }
-//
-//        let handlers = MLUpdateProgressHandlers(
-//                            forEvents: [.trainingBegin, .miniBatchEnd, .epochEnd],
-//                            progressHandler: progressHandler,
-//                            completionHandler: completionHandler)
-//
-//        self.trainingStartTime = Date()
-//
-//        let updateTask = try! MLUpdateTask(forModelAt: coreMLCompiledModelUrl!,
-//                                           trainingData: trainingBatchProvider!,
-//                                           configuration: configuration,
-//                                           progressHandlers: handlers)
-//
-//        updateTask.resume()
-//    }
-//
-//    public func testModel() {
-//        let predictionProvider = try! self.retrainedModel?.predictions(fromBatch: predictionBatchProvider!)
-//
-//        print(predictionProvider!.count)
-//        var correct = 0
-//        for i in 0..<predictionProvider!.count {
-//            let label = predictionLabels[i]
-//            let predictionEncoded = predictionProvider!.features(at: i).featureValue(for: "output")!
-//
-//            if predictionEncoded.multiArrayValue![label].floatValue > 0.5 {
-//                correct += 1
-//            }
-//        }
-//
-//        let accuracy = Float(correct) / Float(predictionProvider!.count)
-//
-//        print("Accuracy: \(accuracy)")
-//        self.accuracy = "Accuracy: \(accuracy)"
-//    }
-//
-//    public func predict(data: [[Float]]) -> Int {
-//        let imageMultiArr = try! MLMultiArray(shape: [1, 28, 28], dataType: .float32)
-//
-//        for r in 0..<28 {
-//            for c in 0..<28 {
-//                let i = (r*28)+c
-//                imageMultiArr[i] = NSNumber(value: data[r][c]) // already normalized
-//            }
-//        }
-//
-//        let imageValue = MLFeatureValue(multiArray: imageMultiArr)
-//
-//        let dataPointFeatures: [String: MLFeatureValue] = ["image": imageValue]
-//
-//        let provider = try! MLDictionaryFeatureProvider(dictionary: dataPointFeatures)
-//
-//        guard let prediction = try! retrainedModel?.prediction(from: provider) else { return -1 }
-//
-//        let oneHotPrediction = prediction.featureValue(for: "output")!
-//
-//        var predictedNumber = -1
-//        var max: Float = -1.0
-//
-//        for i in 0..<10 {
-//            if oneHotPrediction.multiArrayValue![i].floatValue > max {
-//                predictedNumber = i
-//                max = oneHotPrediction.multiArrayValue![i].floatValue
-//            }
-//        }
-//
-//        return predictedNumber
-//    }
 }
 
