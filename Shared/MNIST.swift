@@ -38,7 +38,9 @@ public class MNIST : ObservableObject {
 //        predictionLabels = [Int]()
 //    }
     
-    public func readDataSet(fileName: String, updateStatus: (Int) -> Void) -> (MLCTensor, MLCTensor) {
+    public func readDataSet(fileName: String, updateStatus: @escaping (Int) -> Void) -> (MLCTensor, MLCTensor) {
+        let serialQueue = DispatchQueue(label: "MNIST.serial.queue.\(fileName)")
+        
         var count = 0
         var X = [Float]()
         var Y = [Int64]()
@@ -58,17 +60,31 @@ public class MNIST : ObservableObject {
             fclose(filePointer)
         }
 
+        let iterations = 20
+        var iteration = 0
+        var iterationList = Array<Array<String>>(repeating: Array<String>(), count: iterations)
+        
         while (bytesRead > 0) {
             let line = String.init(cString:lineByteArrayPointer!).trimmingCharacters(in: .whitespacesAndNewlines)
 
-            let sample = line.split(separator: ",").compactMap({Int64(String($0))})
-            Y.append(sample[0])
-            X.append(contentsOf: sample[1...imageSize].map{Float($0) / Float(255.0)})
-
-            count += 1
-            updateStatus(count)
-
+            iterationList[iteration].append(line)
+            iteration = (iteration + 1) % iterations
+            
             bytesRead = getline(&lineByteArrayPointer, &lineCap, filePointer)
+        }
+        
+        DispatchQueue.concurrentPerform(iterations: iterations) { iteration in
+            for line in iterationList[iteration] {
+                let sample = line.split(separator: ",").compactMap({Int64($0)})
+
+                serialQueue.sync {
+                    Y.append(sample[0])
+                    X.append(contentsOf: sample[1...self.imageSize].map{Float($0) / Float(255.0)})
+                    
+                    count += 1
+                    updateStatus(count)
+                }
+            }
         }
         
         let xData = X.withUnsafeBufferPointer { pointer in
