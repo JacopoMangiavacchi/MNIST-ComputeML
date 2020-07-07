@@ -1,6 +1,6 @@
 //
 //  MNIST.swift
-//  CoreML_Training
+//  MNIST-ComputeML
 //
 //  Created by Jacopo Mangiavacchi on 6/28/20.
 //  Copyright © 2020 Jacopo Mangiavacchi. All rights reserved.
@@ -27,25 +27,22 @@ public class MNIST : ObservableObject {
     @Published public var epoch: Int = 5
     
     // Load in memory and split is not performant
-    private func processFileLines(filePath: String, process: (String) -> Void) {
+    private func getFileLine(filePath: String, process: (String) -> Void) {
         guard let filePointer:UnsafeMutablePointer<FILE> = fopen(filePath,"r") else {
             preconditionFailure("Could not open file at \(filePath)")
         }
-
-        var lineByteArrayPointer: UnsafeMutablePointer<CChar>? = nil
-        var lineCap: Int = 0
-        var bytesRead = getline(&lineByteArrayPointer, &lineCap, filePointer)
 
         defer {
             fclose(filePointer)
         }
 
-        while (bytesRead > 0) {
+        var lineByteArrayPointer: UnsafeMutablePointer<CChar>? = nil
+        var lineCap: Int = 0
+
+        while getline(&lineByteArrayPointer, &lineCap, filePointer) > 0 {
             let line = String.init(cString:lineByteArrayPointer!).trimmingCharacters(in: .whitespacesAndNewlines)
 
             process(line)
-            
-            bytesRead = getline(&lineByteArrayPointer, &lineCap, filePointer)
         }
     }
     
@@ -64,7 +61,7 @@ public class MNIST : ObservableObject {
         var iteration = 0
         var iterationList = Array<Array<String>>(repeating: Array<String>(), count: iterations)
 
-        processFileLines(filePath: filePath) { line in
+        getFileLine(filePath: filePath) { line in
             iterationList[iteration].append(line)
             iteration = (iteration + 1) % iterations
         }
@@ -146,6 +143,46 @@ public class MNIST : ObservableObject {
 
         let graph = MLCGraph()
         
+//        let dense1 = graph.node(with: MLCFullyConnectedLayer(weights: MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 784*128, 1, 1], dataType: .float32)!,
+//                                                                                randomInitializerType: .glorotUniform),
+//                                                            biases: MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 128, 1, 1], dataType: .float32)!,
+//                                                                              randomInitializerType: .glorotUniform),
+//                                                            descriptor: MLCConvolutionDescriptor(kernelSizes: (height: 784, width: 128),
+//                                                                                                 inputFeatureChannelCount: 784,
+//                                                                                                 outputFeatureChannelCount: 128))!,
+//                               source: MLCTensor(descriptor: MLCTensorDescriptor(shape: [784, 1], dataType: .float32)!))
+//
+////        let dense1 = graph.node(with: MLCMatMulLayer(descriptor: MLCMatMulDescriptor())!,
+////                                source: MLCTensor(descriptor: MLCTensorDescriptor(shape: [784, 1], dataType: .float32)!))
+//
+//        let inferenceGraph = MLCInferenceGraph(graphObjects: [graph])
+//
+//        inferenceGraph.addInputs(["image" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 784, 1, 1], dataType: .float32)!)])
+//
+//        let b = inferenceGraph.compile(options: [], device: MLCDevice(type: .cpu)!)
+//
+//        print(b)
+
+//        let trainingGraph = MLCTrainingGraph(graphObjects: [graph],
+//                                             lossLayer: MLCLossLayer(descriptor: MLCLossDescriptor(type: .meanSquaredError,
+//                                                                                                   reductionType: .none)),
+//                                             optimizer: MLCOptimizer(descriptor: MLCOptimizerDescriptor(learningRate: 0.1,
+//                                                                                                        gradientRescale: 0.1,
+//                                                                                                        regularizationType: .none,
+//                                                                                                        regularizationScale: 0.0)))
+//
+//        trainingGraph.addInputs(["image" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 784, 1, 1], dataType: .float32)!)],
+//                                lossLabels: ["label" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 128, 1, 1], dataType: .float32)!)])
+//
+//        let b = trainingGraph.compile(options: [], device: MLCDevice(type: .cpu)!)
+//
+//        print(b)
+
+
+        
+        
+
+
         // DENSE LAYER
         // -----------
         //  INPUT SHAPE: (784, 1)
@@ -173,25 +210,25 @@ public class MNIST : ObservableObject {
                                                                                                  inputFeatureChannelCount: 128,
                                                                                                  outputFeatureChannelCount: 10))!,
                                sources: [dense1!])
-        
+
         // SOFTMAX ACTIVATION
         // ------------------
-        graph.node(with: MLCSoftmaxLayer(operation: MLCSoftmaxOperation(rawValue: 10)!),
+        graph.node(with: MLCSoftmaxLayer(operation: .softmax),
                    source: dense2!)
         
         let trainingGraph = MLCTrainingGraph(graphObjects: [graph],
-                                             lossLayer: MLCLossLayer(descriptor: MLCLossDescriptor(type: .softmaxCrossEntropy,
+                                             lossLayer: MLCLossLayer(descriptor: MLCLossDescriptor(type: .categoricalCrossEntropy, //softmaxCrossEntropy
                                                                                                    reductionType: .none)),
                                              optimizer: MLCOptimizer(descriptor: MLCOptimizerDescriptor(learningRate: 0.1,
                                                                                                         gradientRescale: 0.1,
                                                                                                         regularizationType: .none,
                                                                                                         regularizationScale: 0.0)))
-        
+
         trainingGraph.addInputs(["image" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [784, 1], dataType: .float32)!)],
                                 lossLabels: ["label" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [10, 1], dataType: .int64)!)])
 
         let b = trainingGraph.compile(options: [], device: MLCDevice(type: .cpu)!)
-        
+
         print(b)
         
     }
