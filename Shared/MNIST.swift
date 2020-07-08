@@ -82,7 +82,7 @@ public class MNIST : ObservableObject {
         
         let xData = X.withUnsafeBufferPointer { pointer in
             MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!,
-                          length: pointer.count * MemoryLayout<Float>.size * imageSize)
+                          length: pointer.count * MemoryLayout<Float>.size)
         }
 
         let yData = Y.withUnsafeBufferPointer { pointer in
@@ -191,6 +191,27 @@ public class MNIST : ObservableObject {
 
         print(b)
         
+        
+        trainingGraph.execute(inputsData: ["image" : trainingBatchProviderXTensor!.optimizerData[0]],
+                              lossLabelsData: ["label" : trainingBatchProviderYTensor!.optimizerData[0]],
+                              lossLabelWeightsData: nil,
+                              batchSize: 0,
+                              options: []) { (r, e, time) in
+            print("Error: \(String(describing: e))")
+            print("Result: \(String(describing: r))")
+
+            let buffer3 = UnsafeMutableRawPointer.allocate(byteCount: 6 * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
+            
+            r!.copyDataFromDeviceMemory(toBytes: buffer3, length: 6 * MemoryLayout<Float>.size, synchronizeWithDevice: false)
+            
+            let float4Ptr = buffer3.bindMemory(to: Float.self, capacity: 6)
+            let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: 6)
+            print(Array(float4Buffer))
+            
+        }
+        
+        
+
     }
     
 }
