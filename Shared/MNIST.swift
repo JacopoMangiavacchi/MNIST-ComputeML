@@ -142,46 +142,6 @@ public class MNIST : ObservableObject {
         // ])
 
         let graph = MLCGraph()
-        
-//        let dense1 = graph.node(with: MLCFullyConnectedLayer(weights: MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 784*128, 1, 1], dataType: .float32)!,
-//                                                                                randomInitializerType: .glorotUniform),
-//                                                            biases: MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 128, 1, 1], dataType: .float32)!,
-//                                                                              randomInitializerType: .glorotUniform),
-//                                                            descriptor: MLCConvolutionDescriptor(kernelSizes: (height: 784, width: 128),
-//                                                                                                 inputFeatureChannelCount: 784,
-//                                                                                                 outputFeatureChannelCount: 128))!,
-//                               source: MLCTensor(descriptor: MLCTensorDescriptor(shape: [784, 1], dataType: .float32)!))
-//
-////        let dense1 = graph.node(with: MLCMatMulLayer(descriptor: MLCMatMulDescriptor())!,
-////                                source: MLCTensor(descriptor: MLCTensorDescriptor(shape: [784, 1], dataType: .float32)!))
-//
-//        let inferenceGraph = MLCInferenceGraph(graphObjects: [graph])
-//
-//        inferenceGraph.addInputs(["image" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 784, 1, 1], dataType: .float32)!)])
-//
-//        let b = inferenceGraph.compile(options: [], device: MLCDevice(type: .cpu)!)
-//
-//        print(b)
-
-//        let trainingGraph = MLCTrainingGraph(graphObjects: [graph],
-//                                             lossLayer: MLCLossLayer(descriptor: MLCLossDescriptor(type: .meanSquaredError,
-//                                                                                                   reductionType: .none)),
-//                                             optimizer: MLCOptimizer(descriptor: MLCOptimizerDescriptor(learningRate: 0.1,
-//                                                                                                        gradientRescale: 0.1,
-//                                                                                                        regularizationType: .none,
-//                                                                                                        regularizationScale: 0.0)))
-//
-//        trainingGraph.addInputs(["image" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 784, 1, 1], dataType: .float32)!)],
-//                                lossLabels: ["label" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 128, 1, 1], dataType: .float32)!)])
-//
-//        let b = trainingGraph.compile(options: [], device: MLCDevice(type: .cpu)!)
-//
-//        print(b)
-
-
-        
-        
-
 
         // DENSE LAYER
         // -----------
@@ -196,7 +156,7 @@ public class MNIST : ObservableObject {
                                                             descriptor: MLCConvolutionDescriptor(kernelSizes: (height: 784, width: 128),
                                                                                                  inputFeatureChannelCount: 784,
                                                                                                  outputFeatureChannelCount: 128))!,
-                               sources: [MLCTensor(descriptor: MLCTensorDescriptor(shape: [784, 1], dataType: .float32)!)])
+                               sources: [MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 784, 1, 1], dataType: .float32)!)])
         
         // DENSE LAYER
         // -----------
@@ -217,9 +177,9 @@ public class MNIST : ObservableObject {
                    source: dense2!)
         
         let trainingGraph = MLCTrainingGraph(graphObjects: [graph],
-                                             lossLayer: MLCLossLayer(descriptor: MLCLossDescriptor(type: .categoricalCrossEntropy, //softmaxCrossEntropy
+                                             lossLayer: MLCLossLayer(descriptor: MLCLossDescriptor(type: .categoricalCrossEntropy,
                                                                                                    reductionType: .none)),
-                                             optimizer: MLCOptimizer(descriptor: MLCOptimizerDescriptor(learningRate: 0.1,
+                                             optimizer: MLCSGDOptimizer(descriptor: MLCOptimizerDescriptor(learningRate: 0.1,
                                                                                                         gradientRescale: 0.1,
                                                                                                         regularizationType: .none,
                                                                                                         regularizationScale: 0.0)))
