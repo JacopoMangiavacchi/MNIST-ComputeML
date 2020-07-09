@@ -35,7 +35,7 @@ struct ContentView: View {
                                     self.mnist.asyncPrepareTrainBatchProvider()
                                     self.mnist.asyncPreparePredictionBatchProvider()
                                 }) {
-                                    Text("Start")
+                                    Text("Prep")
                                 }
                             }
                         }
@@ -47,7 +47,7 @@ struct ContentView: View {
                                 Button(action: {
                                     self.mnist.trainGraph()
                                 }) {
-                                    Text("Start")
+                                    Text("Train")
                                 }.disabled(!self.isDataReady(trainingCount: self.mnist.trainingBatchCount, predictionCount: self.mnist.predictionBatchCount))
                             }
                         }

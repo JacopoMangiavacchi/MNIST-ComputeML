@@ -182,18 +182,17 @@ public class MNIST : ObservableObject {
         
         // TRAINING LOOP
         for epoch in 0..<epochs {
-            print("Epoch: \(epoch)")
             for batch in 0..<batches {
-                print("  Batch: \(batch)")
-
                 let xData = trainingBatchProviderX!.withUnsafeBufferPointer { pointer in
+                    // TODO: MOVE pointer according to batch and get length only for the batch
                     MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!,
-                                  length: pointer.count * MemoryLayout<Float>.size)
+                                  length: batchSize * MemoryLayout<Float>.size)
                 }
 
                 let yData = trainingBatchProviderY!.withUnsafeBufferPointer { pointer in
+                    // TODO: MOVE pointer according to batch and get length only for the batch
                     MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!,
-                                  length: pointer.count * MemoryLayout<Int>.size)
+                                  length: batchSize * MemoryLayout<Int>.size)
                 }
                 
                 trainingGraph.execute(inputsData: ["image" : xData],
@@ -201,7 +200,8 @@ public class MNIST : ObservableObject {
                                       lossLabelWeightsData: nil,
                                       batchSize: batchSize,
                                       options: []) { (r, e, time) in
-                    print("    Error: \(String(describing: e))")
+
+                    print("Epoch: \(epoch) Batch: \(batch) Error: \(String(describing: e))")
 //                    print("    Result: \(String(describing: r))")
 
                     // TODO: VALIDATE !!
