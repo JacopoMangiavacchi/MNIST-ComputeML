@@ -45,7 +45,7 @@ struct ContentView: View {
                                 Text("Train the model")
                                 Spacer()
                                 Button(action: {
-                                    self.mnist.prepareGraph()
+                                    self.mnist.trainGraph()
                                 }) {
                                     Text("Start")
                                 }.disabled(!self.isDataReady(trainingCount: self.mnist.trainingBatchCount, predictionCount: self.mnist.predictionBatchCount))

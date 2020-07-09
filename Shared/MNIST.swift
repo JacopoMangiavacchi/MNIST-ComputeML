@@ -117,7 +117,7 @@ public class MNIST : ObservableObject {
         }
     }
     
-    public func prepareGraph() {
+    public func trainGraph() {
         // MODEL
         // -----
         // model = keras.Sequential([
@@ -125,9 +125,13 @@ public class MNIST : ObservableObject {
         //     keras.layers.Dense(10)                       // W (128, 10)   B (10,)
         // ])
         
+        let epochs = 1
+        let batchSize = 25
+        let trainingSample = 60000
+        let batches = trainingSample / batchSize
+
         let dense1LayerOutputSize = 128
         let finalClassesSize = 10
-        let batchSize = 60000
 
         let device = MLCDevice(type: .cpu)!
 
@@ -174,37 +178,48 @@ public class MNIST : ObservableObject {
                                 lossLabels: ["label" : lossLabelTensor])
 
         
-        let b = trainingGraph.compile(options: [], device: device)
-        print(b)
+        trainingGraph.compile(options: [], device: device)
         
-        let xData = trainingBatchProviderX!.withUnsafeBufferPointer { pointer in
-            MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!,
-                          length: pointer.count * MemoryLayout<Float>.size)
-        }
+        // TRAINING LOOP
+        for epoch in 0..<epochs {
+            print("Epoch: \(epoch)")
+            for batch in 0..<batches {
+                print("  Batch: \(batch)")
 
-        let yData = trainingBatchProviderY!.withUnsafeBufferPointer { pointer in
-            MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!,
-                          length: pointer.count * MemoryLayout<Int>.size)
+                let xData = trainingBatchProviderX!.withUnsafeBufferPointer { pointer in
+                    MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!,
+                                  length: pointer.count * MemoryLayout<Float>.size)
+                }
+
+                let yData = trainingBatchProviderY!.withUnsafeBufferPointer { pointer in
+                    MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!,
+                                  length: pointer.count * MemoryLayout<Int>.size)
+                }
+                
+                trainingGraph.execute(inputsData: ["image" : xData],
+                                      lossLabelsData: ["label" : yData],
+                                      lossLabelWeightsData: nil,
+                                      batchSize: batchSize,
+                                      options: []) { (r, e, time) in
+                    print("    Error: \(String(describing: e))")
+//                    print("    Result: \(String(describing: r))")
+
+                    // TODO: VALIDATE !!
+                    
+//                    let buffer3 = UnsafeMutableRawPointer.allocate(byteCount: 10 * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
+//
+//                    r!.copyDataFromDeviceMemory(toBytes: buffer3, length: 10 * MemoryLayout<Float>.size, synchronizeWithDevice: false)
+//
+//                    let float4Ptr = buffer3.bindMemory(to: Float.self, capacity: 10)
+//                    let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: 10)
+//                    print(Array(float4Buffer))
+//
+                }
+            }
         }
         
-        trainingGraph.execute(inputsData: ["image" : xData],
-                              lossLabelsData: ["label" : yData],
-                              lossLabelWeightsData: nil,
-                              batchSize: batchSize,
-                              options: []) { (r, e, time) in
-            print("Error: \(String(describing: e))")
-            print("Result: \(String(describing: r))")
+        // TODO: CREATE INFERENCE GRAPH REUSING TRAINING WEIGHTS/BIASES
 
-//            let buffer3 = UnsafeMutableRawPointer.allocate(byteCount: 10 * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
-//
-//            r!.copyDataFromDeviceMemory(toBytes: buffer3, length: 10 * MemoryLayout<Float>.size, synchronizeWithDevice: false)
-//
-//            let float4Ptr = buffer3.bindMemory(to: Float.self, capacity: 10)
-//            let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: 10)
-//            print(Array(float4Buffer))
-
-        }
     }
-    
 }
 
