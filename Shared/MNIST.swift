@@ -127,11 +127,12 @@ public class MNIST : ObservableObject {
         
         let dense1LayerOutputSize = 128
         let finalClassesSize = 10
+        let batchSize = 60000
 
         let device = MLCDevice(type: .cpu)!
 
-        let inputTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, imageSize, 1, 1], dataType: .float32)!)
-        let lossLabelTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, finalClassesSize], dataType: .int64)!)
+        let inputTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, imageSize, 1, 1], dataType: .float32)!)
+        let lossLabelTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, finalClassesSize], dataType: .int64)!)
         
         let dense1WeightsTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, imageSize*dense1LayerOutputSize, 1, 1], dataType: .float32)!,
                                             randomInitializerType: .glorotUniform)
@@ -185,21 +186,21 @@ public class MNIST : ObservableObject {
             MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!,
                           length: pointer.count * MemoryLayout<Int>.size)
         }
-
+        
         trainingGraph.execute(inputsData: ["image" : xData],
                               lossLabelsData: ["label" : yData],
                               lossLabelWeightsData: nil,
-                              batchSize: 1,
+                              batchSize: batchSize,
                               options: []) { (r, e, time) in
             print("Error: \(String(describing: e))")
             print("Result: \(String(describing: r))")
 
-//            let buffer3 = UnsafeMutableRawPointer.allocate(byteCount: 6 * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
+//            let buffer3 = UnsafeMutableRawPointer.allocate(byteCount: 10 * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
 //
-//            r!.copyDataFromDeviceMemory(toBytes: buffer3, length: 6 * MemoryLayout<Float>.size, synchronizeWithDevice: false)
+//            r!.copyDataFromDeviceMemory(toBytes: buffer3, length: 10 * MemoryLayout<Float>.size, synchronizeWithDevice: false)
 //
-//            let float4Ptr = buffer3.bindMemory(to: Float.self, capacity: 6)
-//            let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: 6)
+//            let float4Ptr = buffer3.bindMemory(to: Float.self, capacity: 10)
+//            let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: 10)
 //            print(Array(float4Buffer))
 
         }
