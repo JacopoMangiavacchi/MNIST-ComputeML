@@ -15,10 +15,10 @@ public class MNIST : ObservableObject {
 
     @Published public var trainingBatchCount = 0
     @Published public var predictionBatchCount = 0
-    @Published public var trainingBatchProviderXTensor: MLCTensor?
-    @Published public var trainingBatchProviderYTensor: MLCTensor?
-    @Published public var predictionBatchProviderXTensor: MLCTensor?
-    @Published public var predictionBatchProviderYTensor: MLCTensor?
+    @Published public var trainingBatchProviderX: [Float]?
+    @Published public var trainingBatchProviderY: [Int64]?
+    @Published public var predictionBatchProviderX: [Float]?
+    @Published public var predictionBatchProviderY: [Int64]?
     @Published public var modelPrepared = false
     @Published public var modelCompiled = false
     @Published public var modelTrained = false
@@ -46,7 +46,7 @@ public class MNIST : ObservableObject {
         }
     }
     
-    public func readDataSet(fileName: String, updateStatus: @escaping (Int) -> Void) -> (MLCTensor, MLCTensor) {
+    public func readDataSet(fileName: String, updateStatus: @escaping (Int) -> Void) -> ([Float], [Int64]) { //}(MLCTensor, MLCTensor) {
         guard let filePath = Bundle.main.path(forResource: fileName, ofType: "csv") else {
             fatalError("CSV file not found")
         }
@@ -80,23 +80,7 @@ public class MNIST : ObservableObject {
             }
         }
         
-        let xData = X.withUnsafeBufferPointer { pointer in
-            MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!,
-                          length: pointer.count * MemoryLayout<Float>.size)
-        }
-
-        let yData = Y.withUnsafeBufferPointer { pointer in
-            MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!,
-                          length: pointer.count * MemoryLayout<Int>.size)
-        }
-
-        let xTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [count, imageSize], dataType: .float32)!,
-                                data: xData)
-
-        let yTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [count, 1], dataType: .int64)!,
-                                data: yData)
-
-        return (xTensor, yTensor)
+        return (X, Y)
     }
         
     public func asyncPrepareTrainBatchProvider() {
@@ -109,9 +93,9 @@ public class MNIST : ObservableObject {
             }
             
             DispatchQueue.main.async {
-                self.trainingBatchCount = X.descriptor.shape[0]
-                self.trainingBatchProviderXTensor = X
-                self.trainingBatchProviderYTensor = Y
+                self.trainingBatchCount = X.count / self.imageSize
+                self.trainingBatchProviderX = X
+                self.trainingBatchProviderY = Y
             }
         }
     }
@@ -126,9 +110,9 @@ public class MNIST : ObservableObject {
             }
             
             DispatchQueue.main.async {
-                self.predictionBatchCount = X.descriptor.shape[0]
-                self.predictionBatchProviderXTensor = X
-                self.predictionBatchProviderYTensor = Y
+                self.predictionBatchCount = X.count / self.imageSize
+                self.predictionBatchProviderX = X
+                self.predictionBatchProviderY = Y
             }
         }
     }
@@ -149,14 +133,14 @@ public class MNIST : ObservableObject {
         //  LABEL SHAPE: (10, 1)
         //  OUTPUT SHAPE: (128, 1)
         //  NB Weights and Bias have to be 4d shaped
-        let dense1 = graph.node(with: MLCFullyConnectedLayer(weights: MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 784*128, 1, 1], dataType: .float32)!,
+        let dense1 = graph.node(with: MLCFullyConnectedLayer(weights: MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, imageSize*128, 1, 1], dataType: .float32)!,
                                                                                 randomInitializerType: .glorotUniform),
                                                             biases: MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 128, 1, 1], dataType: .float32)!,
                                                                               randomInitializerType: .glorotUniform),
-                                                            descriptor: MLCConvolutionDescriptor(kernelSizes: (height: 784, width: 128),
-                                                                                                 inputFeatureChannelCount: 784,
+                                                            descriptor: MLCConvolutionDescriptor(kernelSizes: (height: imageSize, width: 128),
+                                                                                                 inputFeatureChannelCount: imageSize,
                                                                                                  outputFeatureChannelCount: 128))!,
-                               sources: [MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 784, 1, 1], dataType: .float32)!)])
+                               sources: [MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, imageSize, 1, 1], dataType: .float32)!)])
         
         // DENSE LAYER
         // -----------
@@ -184,34 +168,51 @@ public class MNIST : ObservableObject {
                                                                                                         regularizationType: .none,
                                                                                                         regularizationScale: 0.0)))
 
-        trainingGraph.addInputs(["image" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [784, 1], dataType: .float32)!)],
+        trainingGraph.addInputs(["image" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [imageSize, 1], dataType: .float32)!)],
                                 lossLabels: ["label" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [10, 1], dataType: .int64)!)])
 
-        let b = trainingGraph.compile(options: [], device: MLCDevice(type: .cpu)!)
-
+        let device = MLCDevice(type: .cpu)!
+        
+        let b = trainingGraph.compile(options: [], device: device)
         print(b)
         
+        let xData = trainingBatchProviderX!.withUnsafeBufferPointer { pointer in
+            MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!,
+                          length: pointer.count * MemoryLayout<Float>.size)
+        }
+
+        let yData = trainingBatchProviderY!.withUnsafeBufferPointer { pointer in
+            MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!,
+                          length: pointer.count * MemoryLayout<Int>.size)
+        }
+
+//        let count = trainingBatchProviderX!.count / imageSize
+//
+//        let xTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [count, imageSize], dataType: .float32)!,
+//                                data: xData)
+//
+//        let yTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [count, 1], dataType: .int64)!,
+//                                data: yData)
         
-        trainingGraph.execute(inputsData: ["image" : trainingBatchProviderXTensor!.optimizerData[0]],
-                              lossLabelsData: ["label" : trainingBatchProviderYTensor!.optimizerData[0]],
+
+        
+        trainingGraph.execute(inputsData: ["image" : xData],
+                              lossLabelsData: ["label" : yData],
                               lossLabelWeightsData: nil,
-                              batchSize: 0,
+                              batchSize: 1,
                               options: []) { (r, e, time) in
             print("Error: \(String(describing: e))")
             print("Result: \(String(describing: r))")
 
-            let buffer3 = UnsafeMutableRawPointer.allocate(byteCount: 6 * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
-            
-            r!.copyDataFromDeviceMemory(toBytes: buffer3, length: 6 * MemoryLayout<Float>.size, synchronizeWithDevice: false)
-            
-            let float4Ptr = buffer3.bindMemory(to: Float.self, capacity: 6)
-            let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: 6)
-            print(Array(float4Buffer))
-            
-        }
-        
-        
+//            let buffer3 = UnsafeMutableRawPointer.allocate(byteCount: 6 * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
+//
+//            r!.copyDataFromDeviceMemory(toBytes: buffer3, length: 6 * MemoryLayout<Float>.size, synchronizeWithDevice: false)
+//
+//            let float4Ptr = buffer3.bindMemory(to: Float.self, capacity: 6)
+//            let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: 6)
+//            print(Array(float4Buffer))
 
+        }
     }
     
 }
