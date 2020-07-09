@@ -124,39 +124,40 @@ public class MNIST : ObservableObject {
         //     keras.layers.Dense(128, activation='relu'),  // W (784, 128)  B (128,)
         //     keras.layers.Dense(10)                       // W (128, 10)   B (10,)
         // ])
+        
+        let dense1LayerOutputSize = 128
+        let finalClassesSize = 10
+
+        let device = MLCDevice(type: .cpu)!
+
+        let inputTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, imageSize, 1, 1], dataType: .float32)!)
+        let lossLabelTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, finalClassesSize], dataType: .int64)!)
+        
+        let dense1WeightsTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, imageSize*dense1LayerOutputSize, 1, 1], dataType: .float32)!,
+                                            randomInitializerType: .glorotUniform)
+        let dense1BiasesTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, dense1LayerOutputSize, 1, 1], dataType: .float32)!,
+                                           randomInitializerType: .glorotUniform)
+        let dense2WeightsTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, dense1LayerOutputSize*finalClassesSize, 1, 1], dataType: .float32)!,
+                                            randomInitializerType: .glorotUniform)
+        let dense2BiasesTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, finalClassesSize, 1, 1], dataType: .float32)!,
+                                           randomInitializerType: .glorotUniform)
 
         let graph = MLCGraph()
 
-        // DENSE LAYER
-        // -----------
-        //  INPUT SHAPE: (784, 1)
-        //  LABEL SHAPE: (10, 1)
-        //  OUTPUT SHAPE: (128, 1)
-        //  NB Weights and Bias have to be 4d shaped
-        let dense1 = graph.node(with: MLCFullyConnectedLayer(weights: MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, imageSize*128, 1, 1], dataType: .float32)!,
-                                                                                randomInitializerType: .glorotUniform),
-                                                            biases: MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 128, 1, 1], dataType: .float32)!,
-                                                                              randomInitializerType: .glorotUniform),
-                                                            descriptor: MLCConvolutionDescriptor(kernelSizes: (height: imageSize, width: 128),
+        let dense1 = graph.node(with: MLCFullyConnectedLayer(weights: dense1WeightsTensor,
+                                                            biases: dense1BiasesTensor,
+                                                            descriptor: MLCConvolutionDescriptor(kernelSizes: (height: imageSize, width: dense1LayerOutputSize),
                                                                                                  inputFeatureChannelCount: imageSize,
-                                                                                                 outputFeatureChannelCount: 128))!,
-                               sources: [MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, imageSize, 1, 1], dataType: .float32)!)])
+                                                                                                 outputFeatureChannelCount: dense1LayerOutputSize))!,
+                               sources: [inputTensor])
         
-        // DENSE LAYER
-        // -----------
-        //  INPUT SHAPE: (128, 1)
-        //  OUTPUT SHAPE: (10, 1)
-        let dense2 = graph.node(with: MLCFullyConnectedLayer(weights: MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 128*10, 1, 1], dataType: .float32)!,
-                                                                                randomInitializerType: .glorotUniform),
-                                                            biases: MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, 10, 1, 1], dataType: .float32)!,
-                                                                              randomInitializerType: .glorotUniform),
-                                                            descriptor: MLCConvolutionDescriptor(kernelSizes: (height: 128, width: 10),
-                                                                                                 inputFeatureChannelCount: 128,
-                                                                                                 outputFeatureChannelCount: 10))!,
+        let dense2 = graph.node(with: MLCFullyConnectedLayer(weights: dense2WeightsTensor,
+                                                            biases: dense2BiasesTensor,
+                                                            descriptor: MLCConvolutionDescriptor(kernelSizes: (height: dense1LayerOutputSize, width: finalClassesSize),
+                                                                                                 inputFeatureChannelCount: dense1LayerOutputSize,
+                                                                                                 outputFeatureChannelCount: finalClassesSize))!,
                                sources: [dense1!])
 
-        // SOFTMAX ACTIVATION
-        // ------------------
         graph.node(with: MLCSoftmaxLayer(operation: .softmax),
                    source: dense2!)
         
@@ -168,10 +169,9 @@ public class MNIST : ObservableObject {
                                                                                                         regularizationType: .none,
                                                                                                         regularizationScale: 0.0)))
 
-        trainingGraph.addInputs(["image" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [imageSize, 1], dataType: .float32)!)],
-                                lossLabels: ["label" : MLCTensor(descriptor: MLCTensorDescriptor(shape: [10, 1], dataType: .int64)!)])
+        trainingGraph.addInputs(["image" : inputTensor],
+                                lossLabels: ["label" : lossLabelTensor])
 
-        let device = MLCDevice(type: .cpu)!
         
         let b = trainingGraph.compile(options: [], device: device)
         print(b)
@@ -186,16 +186,6 @@ public class MNIST : ObservableObject {
                           length: pointer.count * MemoryLayout<Int>.size)
         }
 
-//        let count = trainingBatchProviderX!.count / imageSize
-//
-//        let xTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [count, imageSize], dataType: .float32)!,
-//                                data: xData)
-//
-//        let yTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [count, 1], dataType: .int64)!,
-//                                data: yData)
-        
-
-        
         trainingGraph.execute(inputsData: ["image" : xData],
                               lossLabelsData: ["label" : yData],
                               lossLabelWeightsData: nil,
