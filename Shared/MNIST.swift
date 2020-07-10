@@ -19,11 +19,7 @@ public class MNIST : ObservableObject {
     @Published public var trainingBatchProviderY: [Int64]?
     @Published public var predictionBatchProviderX: [Float]?
     @Published public var predictionBatchProviderY: [Int64]?
-    @Published public var modelPrepared = false
-    @Published public var modelCompiled = false
     @Published public var modelTrained = false
-    @Published public var modelStatus = "Train model"
-    @Published public var accuracy = "Accuracy: n/a"
     @Published public var epochs: Int = 5
     
     // Load in memory and split is not performant
@@ -241,6 +237,7 @@ public class MNIST : ObservableObject {
                 }
             }
         }
+        
+        modelTrained = true
     }
 }
-
