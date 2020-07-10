@@ -24,7 +24,7 @@ public class MNIST : ObservableObject {
     @Published public var modelTrained = false
     @Published public var modelStatus = "Train model"
     @Published public var accuracy = "Accuracy: n/a"
-    @Published public var epoch: Int = 5
+    @Published public var epochs: Int = 5
     
     // Load in memory and split is not performant
     private func getFileLine(filePath: String, process: (String) -> Void) {
@@ -125,10 +125,11 @@ public class MNIST : ObservableObject {
         //     keras.layers.Dense(10)                       // W (128, 10)   B (10,)
         // ])
         
-        let epochs = 1
         let batchSize = 25
-        let trainingSample = 60000
-        let batches = trainingSample / batchSize
+        let trainingSample = trainingBatchProviderX!.count / imageSize
+        let testingSample = predictionBatchProviderX!.count / imageSize
+        let trainBatches = trainingSample / batchSize
+        let testingBatches = testingSample / batchSize
 
         let dense1LayerOutputSize = 128
         let finalClassesSize = 10
@@ -146,6 +147,8 @@ public class MNIST : ObservableObject {
                                             randomInitializerType: .glorotUniform)
         let dense2BiasesTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, finalClassesSize, 1, 1], dataType: .float32)!,
                                            randomInitializerType: .glorotUniform)
+
+        // CREATE TRAINING GRAPH
 
         let graph = MLCGraph()
 
@@ -182,16 +185,14 @@ public class MNIST : ObservableObject {
         
         // TRAINING LOOP
         for epoch in 0..<epochs {
-            for batch in 0..<batches {
+            for batch in 0..<trainBatches {
                 let xData = trainingBatchProviderX!.withUnsafeBufferPointer { pointer in
-                    // TODO: MOVE pointer according to batch and get length only for the batch
-                    MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!,
-                                  length: batchSize * MemoryLayout<Float>.size)
+                    MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!.advanced(by: batch * imageSize * batchSize),
+                                  length: batchSize * imageSize * MemoryLayout<Float>.size)
                 }
 
                 let yData = trainingBatchProviderY!.withUnsafeBufferPointer { pointer in
-                    // TODO: MOVE pointer according to batch and get length only for the batch
-                    MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!,
+                    MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!.advanced(by: batch * batchSize),
                                   length: batchSize * MemoryLayout<Int>.size)
                 }
                 
@@ -199,27 +200,47 @@ public class MNIST : ObservableObject {
                                       lossLabelsData: ["label" : yData],
                                       lossLabelWeightsData: nil,
                                       batchSize: batchSize,
-                                      options: []) { (r, e, time) in
-
-                    print("Epoch: \(epoch) Batch: \(batch) Error: \(String(describing: e))")
-//                    print("    Result: \(String(describing: r))")
-
+                                      options: [.synchronous]) { (r, e, time) in
                     // TODO: VALIDATE !!
-                    
-//                    let buffer3 = UnsafeMutableRawPointer.allocate(byteCount: 10 * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
-//
-//                    r!.copyDataFromDeviceMemory(toBytes: buffer3, length: 10 * MemoryLayout<Float>.size, synchronizeWithDevice: false)
-//
-//                    let float4Ptr = buffer3.bindMemory(to: Float.self, capacity: 10)
-//                    let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: 10)
-//                    print(Array(float4Buffer))
-//
                 }
             }
         }
         
-        // TODO: CREATE INFERENCE GRAPH REUSING TRAINING WEIGHTS/BIASES
+        // CREATE INFERENCE GRAPH REUSING TRAINING WEIGHTS/BIASES
+        let inferenceGraph = MLCInferenceGraph(graphObjects: [graph])
+        inferenceGraph.addInputs(["image" : inputTensor])
+        inferenceGraph.compile(options: [], device: device)
 
+        // TESTING LOOP FOR A FULL EPOCH ON TESTING DATA
+        for batch in 0..<testingBatches {
+            let xData = predictionBatchProviderX!.withUnsafeBufferPointer { pointer in
+                MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!.advanced(by: batch * imageSize * batchSize),
+                              length: batchSize * imageSize * MemoryLayout<Float>.size)
+            }
+            
+            inferenceGraph.execute(inputsData: ["image" : xData],
+                                  batchSize: batchSize,
+                                  options: [.synchronous]) { (r, e, time) in
+                print("Batch \(batch) Error: \(String(describing: e))")
+
+                let bufferOutput = UnsafeMutableRawPointer.allocate(byteCount: batchSize * finalClassesSize * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
+
+                r!.copyDataFromDeviceMemory(toBytes: bufferOutput, length: batchSize * finalClassesSize * MemoryLayout<Float>.size, synchronizeWithDevice: false)
+
+                let float4Ptr = bufferOutput.bindMemory(to: Float.self, capacity: batchSize * finalClassesSize)
+                let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: batchSize * finalClassesSize)
+                let outputArray = Array(float4Buffer)
+
+                for i in 0..<batchSize {
+                    var sample = "\(i): "
+                    for i2 in 0..<finalClassesSize {
+                        sample.append("\(outputArray[(i*finalClassesSize) + i2]) ")
+                    }
+                    
+                    print(sample)
+                }
+            }
+        }
     }
 }
 

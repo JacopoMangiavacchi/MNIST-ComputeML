@@ -40,7 +40,7 @@ struct ContentView: View {
                             }
                         }
                         Section(header: Text("Training")) {
-                            Stepper(value: self.$mnist.epoch, in: 1...10, label: { Text("Epoch:  \(self.mnist.epoch)")})
+                            Stepper(value: self.$mnist.epochs, in: 1...10, label: { Text("Epoch:  \(self.mnist.epochs)")})
                             HStack {
                                 Text("Train the model")
                                 Spacer()
