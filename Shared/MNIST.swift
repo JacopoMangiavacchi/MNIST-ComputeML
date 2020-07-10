@@ -46,7 +46,7 @@ public class MNIST : ObservableObject {
         }
     }
     
-    func oneHotEncoding(_ number: Int64, length: Int = 10) -> [Int64] {
+    private func oneHotEncoding(_ number: Int64, length: Int = 10) -> [Int64] {
         guard number < length else {
             fatalError("wrong ordinal vs encoding length")
         }
@@ -56,10 +56,10 @@ public class MNIST : ObservableObject {
         return array
     }
     
-    func decode(_ encoding: [Int64], length: Int = 10) -> Int64 {
+    private func oneHotDecoding(_ encoding: [Int64]) -> Int64 {
         var value: Int64 = 0
         
-        for i in 0..<length {
+        for i in 0..<encoding.count {
             if encoding[i] == 1 {
                 value = Int64(i)
                 break
@@ -69,11 +69,11 @@ public class MNIST : ObservableObject {
         return value
     }
     
-    func argmaxDecode(_ encoding: [Float], length: Int = 10) -> Int64 {
+    private func argmaxDecoding(_ encoding: [Float]) -> Int64 {
         var max: Float = 0
         var pos: Int64 = 0
         
-        for i in 0..<length {
+        for i in 0..<encoding.count {
             if encoding[i] > max {
                 max = encoding[i]
                 pos = Int64(i)
@@ -83,7 +83,7 @@ public class MNIST : ObservableObject {
         return pos
     }
     
-    public func readDataSet(fileName: String, updateStatus: @escaping (Int) -> Void) -> ([Float], [Int64]) { //}(MLCTensor, MLCTensor) {
+    private func readDataSet(fileName: String, updateStatus: @escaping (Int) -> Void) -> ([Float], [Int64]) { //}(MLCTensor, MLCTensor) {
         guard let filePath = Bundle.main.path(forResource: fileName, ofType: "csv") else {
             fatalError("CSV file not found")
         }
@@ -212,7 +212,7 @@ public class MNIST : ObservableObject {
                                              lossLayer: MLCLossLayer(descriptor: MLCLossDescriptor(type: .categoricalCrossEntropy,
                                                                                                    reductionType: .none)),
                                              optimizer: MLCSGDOptimizer(descriptor: MLCOptimizerDescriptor(learningRate: 0.001,
-                                                                                                           gradientRescale: 0.1,
+                                                                                                           gradientRescale: 0.0,
                                                                                                         regularizationType: .none,
                                                                                                         regularizationScale: 0.0)))
 
@@ -251,6 +251,8 @@ public class MNIST : ObservableObject {
         inferenceGraph.compile(options: [], device: device)
 
         // TESTING LOOP FOR A FULL EPOCH ON TESTING DATA
+        var match = 0
+        
         for batch in 0..<testingBatches {
             let xData = predictionBatchProviderX!.withUnsafeBufferPointer { pointer in
                 MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!.advanced(by: batch * imageSize * batchSize),
@@ -275,10 +277,21 @@ public class MNIST : ObservableObject {
                     let predictionStartingPoint = (i * numberOfClasses) + (batch * batchSize * numberOfClasses)
                     let sampleOutputArray = Array(batchOutputArray[batchStartingPoint..<(batchStartingPoint + numberOfClasses)])
                     let predictionArray = Array(predictionBatchProviderY![predictionStartingPoint..<(predictionStartingPoint + numberOfClasses)])
-                    print("\(i + (batch * batchSize)) -> Esitmate: \(argmaxDecode(sampleOutputArray)) Label: \(decode(predictionArray))")
+                    
+                    let prediction = argmaxDecoding(sampleOutputArray)
+                    let label = oneHotDecoding(predictionArray)
+                    
+                    if prediction == label {
+                        match += 1
+                    }
+                    
+                    print("\(i + (batch * batchSize)) -> Prediction: \(prediction) Label: \(label)")
                 }
             }
         }
+        
+        let accuracy = Float(match) / Float(testingSample)
+        print("Accuracy = \(accuracy) %")
         
         modelTrained = true
     }
