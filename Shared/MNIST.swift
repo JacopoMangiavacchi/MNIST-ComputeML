@@ -211,14 +211,17 @@ public class MNIST : ObservableObject {
         let trainingGraph = MLCTrainingGraph(graphObjects: [graph],
                                              lossLayer: MLCLossLayer(descriptor: MLCLossDescriptor(type: .categoricalCrossEntropy,
                                                                                                    reductionType: .none)),
-                                             optimizer: MLCSGDOptimizer(descriptor: MLCOptimizerDescriptor(learningRate: 0.001,
-                                                                                                           gradientRescale: 0.0,
+                                             optimizer: MLCAdamOptimizer(descriptor: MLCOptimizerDescriptor(learningRate: 0.001,
+                                                                                                           gradientRescale: 1.0,
                                                                                                         regularizationType: .none,
-                                                                                                        regularizationScale: 0.0)))
+                                                                                                        regularizationScale: 0.8),
+                                                                         beta1: 0.9,
+                                                                         beta2: 0.999,
+                                                                         epsilon: 1e-8,
+                                                                         timeStep: 1))
 
         trainingGraph.addInputs(["image" : inputTensor],
                                 lossLabels: ["label" : lossLabelTensor])
-
         
         trainingGraph.compile(options: [], device: device)
         
