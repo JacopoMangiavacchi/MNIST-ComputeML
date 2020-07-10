@@ -195,12 +195,15 @@ public class MNIST : ObservableObject {
                                                                                                  outputFeatureChannelCount: dense1LayerOutputSize))!,
                                sources: [inputTensor])
         
+        let relu1 = graph.node(with: MLCActivationLayer(descriptor: MLCActivationDescriptor(type: MLCActivationType.relu)!),
+                   source: dense1!)
+
         let dense2 = graph.node(with: MLCFullyConnectedLayer(weights: dense2WeightsTensor,
                                                             biases: dense2BiasesTensor,
                                                             descriptor: MLCConvolutionDescriptor(kernelSizes: (height: dense1LayerOutputSize, width: numberOfClasses),
                                                                                                  inputFeatureChannelCount: dense1LayerOutputSize,
                                                                                                  outputFeatureChannelCount: numberOfClasses))!,
-                               sources: [dense1!])
+                               sources: [relu1!])
 
         graph.node(with: MLCSoftmaxLayer(operation: .softmax),
                    source: dense2!)
@@ -209,7 +212,7 @@ public class MNIST : ObservableObject {
                                              lossLayer: MLCLossLayer(descriptor: MLCLossDescriptor(type: .categoricalCrossEntropy,
                                                                                                    reductionType: .none)),
                                              optimizer: MLCSGDOptimizer(descriptor: MLCOptimizerDescriptor(learningRate: 0.001,
-                                                                                                           gradientRescale: 0.5,
+                                                                                                           gradientRescale: 0.1,
                                                                                                         regularizationType: .none,
                                                                                                         regularizationScale: 0.0)))
 
