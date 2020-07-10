@@ -11,6 +11,10 @@ import MLCompute
 
 public class MNIST : ObservableObject {
     let imageSize = 28*28
+    let numberOfClasses = 10
+    let expextedTrainingSamples = 60000
+    let expectedTestingSamples = 10000
+
     let concurrentQueue = DispatchQueue(label: "MNIST.concurrent.queue", attributes: .concurrent)
 
     @Published public var trainingBatchCount = 0
@@ -42,6 +46,43 @@ public class MNIST : ObservableObject {
         }
     }
     
+    func oneHotEncoding(_ number: Int64, length: Int = 10) -> [Int64] {
+        guard number < length else {
+            fatalError("wrong ordinal vs encoding length")
+        }
+        
+        var array = Array<Int64>(repeating: 0, count: length)
+        array[Int(number)] = 1
+        return array
+    }
+    
+    func decode(_ encoding: [Int64], length: Int = 10) -> Int64 {
+        var value: Int64 = 0
+        
+        for i in 0..<length {
+            if encoding[i] == 1 {
+                value = Int64(i)
+                break
+            }
+        }
+        
+        return value
+    }
+    
+    func argmaxDecode(_ encoding: [Float], length: Int = 10) -> Int64 {
+        var max: Float = 0
+        var pos: Int64 = 0
+        
+        for i in 0..<length {
+            if encoding[i] > max {
+                max = encoding[i]
+                pos = Int64(i)
+            }
+        }
+        
+        return pos
+    }
+    
     public func readDataSet(fileName: String, updateStatus: @escaping (Int) -> Void) -> ([Float], [Int64]) { //}(MLCTensor, MLCTensor) {
         guard let filePath = Bundle.main.path(forResource: fileName, ofType: "csv") else {
             fatalError("CSV file not found")
@@ -67,7 +108,7 @@ public class MNIST : ObservableObject {
                 let sample = line.split(separator: ",").compactMap({Int64($0)})
 
                 serialQueue.sync {
-                    Y.append(sample[0])
+                    Y.append(contentsOf: oneHotEncoding(sample[0]))
                     X.append(contentsOf: sample[1...self.imageSize].map{Float($0) / Float(255.0)})
                     
                     count += 1
@@ -128,20 +169,19 @@ public class MNIST : ObservableObject {
         let testingBatches = testingSample / batchSize
 
         let dense1LayerOutputSize = 128
-        let finalClassesSize = 10
 
         let device = MLCDevice(type: .cpu)!
 
         let inputTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, imageSize, 1, 1], dataType: .float32)!)
-        let lossLabelTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, finalClassesSize], dataType: .int64)!)
+        let lossLabelTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, numberOfClasses], dataType: .int64)!)
         
         let dense1WeightsTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, imageSize*dense1LayerOutputSize, 1, 1], dataType: .float32)!,
                                             randomInitializerType: .glorotUniform)
         let dense1BiasesTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, dense1LayerOutputSize, 1, 1], dataType: .float32)!,
                                            randomInitializerType: .glorotUniform)
-        let dense2WeightsTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, dense1LayerOutputSize*finalClassesSize, 1, 1], dataType: .float32)!,
+        let dense2WeightsTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, dense1LayerOutputSize*numberOfClasses, 1, 1], dataType: .float32)!,
                                             randomInitializerType: .glorotUniform)
-        let dense2BiasesTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, finalClassesSize, 1, 1], dataType: .float32)!,
+        let dense2BiasesTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, numberOfClasses, 1, 1], dataType: .float32)!,
                                            randomInitializerType: .glorotUniform)
 
         // CREATE TRAINING GRAPH
@@ -157,9 +197,9 @@ public class MNIST : ObservableObject {
         
         let dense2 = graph.node(with: MLCFullyConnectedLayer(weights: dense2WeightsTensor,
                                                             biases: dense2BiasesTensor,
-                                                            descriptor: MLCConvolutionDescriptor(kernelSizes: (height: dense1LayerOutputSize, width: finalClassesSize),
+                                                            descriptor: MLCConvolutionDescriptor(kernelSizes: (height: dense1LayerOutputSize, width: numberOfClasses),
                                                                                                  inputFeatureChannelCount: dense1LayerOutputSize,
-                                                                                                 outputFeatureChannelCount: finalClassesSize))!,
+                                                                                                 outputFeatureChannelCount: numberOfClasses))!,
                                sources: [dense1!])
 
         graph.node(with: MLCSoftmaxLayer(operation: .softmax),
@@ -168,8 +208,8 @@ public class MNIST : ObservableObject {
         let trainingGraph = MLCTrainingGraph(graphObjects: [graph],
                                              lossLayer: MLCLossLayer(descriptor: MLCLossDescriptor(type: .categoricalCrossEntropy,
                                                                                                    reductionType: .none)),
-                                             optimizer: MLCSGDOptimizer(descriptor: MLCOptimizerDescriptor(learningRate: 0.1,
-                                                                                                        gradientRescale: 0.1,
+                                             optimizer: MLCSGDOptimizer(descriptor: MLCOptimizerDescriptor(learningRate: 0.001,
+                                                                                                           gradientRescale: 0.5,
                                                                                                         regularizationType: .none,
                                                                                                         regularizationScale: 0.0)))
 
@@ -188,8 +228,8 @@ public class MNIST : ObservableObject {
                 }
 
                 let yData = trainingBatchProviderY!.withUnsafeBufferPointer { pointer in
-                    MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!.advanced(by: batch * batchSize),
-                                  length: batchSize * MemoryLayout<Int>.size)
+                    MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!.advanced(by: batch * numberOfClasses * batchSize),
+                                  length: batchSize * numberOfClasses * MemoryLayout<Int>.size)
                 }
                 
                 trainingGraph.execute(inputsData: ["image" : xData],
@@ -216,24 +256,23 @@ public class MNIST : ObservableObject {
             
             inferenceGraph.execute(inputsData: ["image" : xData],
                                   batchSize: batchSize,
-                                  options: [.synchronous]) { (r, e, time) in
-                print("Batch \(batch) Error: \(String(describing: e))")
+                                  options: [.synchronous]) { [self] (r, e, time) in
+//                print("Batch \(batch) Error: \(String(describing: e))")
 
-                let bufferOutput = UnsafeMutableRawPointer.allocate(byteCount: batchSize * finalClassesSize * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
+                let bufferOutput = UnsafeMutableRawPointer.allocate(byteCount: batchSize * numberOfClasses * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
 
-                r!.copyDataFromDeviceMemory(toBytes: bufferOutput, length: batchSize * finalClassesSize * MemoryLayout<Float>.size, synchronizeWithDevice: false)
+                r!.copyDataFromDeviceMemory(toBytes: bufferOutput, length: batchSize * numberOfClasses * MemoryLayout<Float>.size, synchronizeWithDevice: false)
 
-                let float4Ptr = bufferOutput.bindMemory(to: Float.self, capacity: batchSize * finalClassesSize)
-                let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: batchSize * finalClassesSize)
-                let outputArray = Array(float4Buffer)
+                let float4Ptr = bufferOutput.bindMemory(to: Float.self, capacity: batchSize * numberOfClasses)
+                let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: batchSize * numberOfClasses)
+                let batchOutputArray = Array(float4Buffer)
 
                 for i in 0..<batchSize {
-                    var sample = "\(i): "
-                    for i2 in 0..<finalClassesSize {
-                        sample.append("\(outputArray[(i*finalClassesSize) + i2]) ")
-                    }
-                    
-                    print(sample)
+                    let batchStartingPoint = i * numberOfClasses
+                    let predictionStartingPoint = (i * numberOfClasses) + (batch * batchSize * numberOfClasses)
+                    let sampleOutputArray = Array(batchOutputArray[batchStartingPoint..<(batchStartingPoint + numberOfClasses)])
+                    let predictionArray = Array(predictionBatchProviderY![predictionStartingPoint..<(predictionStartingPoint + numberOfClasses)])
+                    print("\(i + (batch * batchSize)) -> Esitmate: \(argmaxDecode(sampleOutputArray)) Label: \(decode(predictionArray))")
                 }
             }
         }

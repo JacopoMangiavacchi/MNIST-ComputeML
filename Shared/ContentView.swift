@@ -27,9 +27,9 @@ struct ContentView: View {
                     Form {
                         Section(header: Text("Dataset")) {
                             HStack {
-                                ProgressView("Training: \(self.mnist.trainingBatchCount)", value: Float(self.mnist.trainingBatchCount), total: 60000)
+                                ProgressView("Training: \(self.mnist.trainingBatchCount)", value: Float(self.mnist.trainingBatchCount), total: Float(self.mnist.expextedTrainingSamples))
                                 Spacer(minLength: 10.0)
-                                ProgressView("Test: \(self.mnist.predictionBatchCount)", value: Float(self.mnist.predictionBatchCount), total: 10000)
+                                ProgressView("Test: \(self.mnist.predictionBatchCount)", value: Float(self.mnist.predictionBatchCount), total: Float(self.mnist.expectedTestingSamples))
                                 Spacer(minLength: 10.0)
                                 Button(action: {
                                     self.mnist.asyncPrepareTrainBatchProvider()
@@ -40,7 +40,7 @@ struct ContentView: View {
                             }
                         }
                         Section(header: Text("Training")) {
-                            Stepper(value: self.$mnist.epochs, in: 1...10, label: { Text("Epoch:  \(self.mnist.epochs)")})
+                            Stepper(value: self.$mnist.epochs, in: 1...20, label: { Text("Epoch:  \(self.mnist.epochs)")})
                             HStack {
                                 Text("Train the model")
                                 Spacer()
