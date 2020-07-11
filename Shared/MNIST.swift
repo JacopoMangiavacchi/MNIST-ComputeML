@@ -242,8 +242,31 @@ public class MNIST : ObservableObject {
                                       lossLabelsData: ["label" : yData],
                                       lossLabelWeightsData: nil,
                                       batchSize: batchSize,
-                                      options: [.synchronous]) { (r, e, time) in
-                    // TODO: VALIDATE !!
+                                      options: [.synchronous]) { [self] (r, e, time) in
+                    // VALIDATE
+                    let bufferOutput = UnsafeMutableRawPointer.allocate(byteCount: batchSize * self.numberOfClasses * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
+
+                    r!.copyDataFromDeviceMemory(toBytes: bufferOutput, length: batchSize * self.numberOfClasses * MemoryLayout<Float>.size, synchronizeWithDevice: false)
+
+                    let float4Ptr = bufferOutput.bindMemory(to: Float.self, capacity: batchSize * self.numberOfClasses)
+                    let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: batchSize * self.numberOfClasses)
+                    let batchOutputArray = Array(float4Buffer)
+
+                    for i in 0..<batchSize {
+                        let batchStartingPoint = i * self.numberOfClasses
+                        let predictionStartingPoint = (i * self.numberOfClasses) + (batch * batchSize * numberOfClasses)
+                        let sampleOutputArray = Array(batchOutputArray[batchStartingPoint..<(batchStartingPoint + self.numberOfClasses)])
+                        let predictionArray = Array(trainingBatchProviderY![predictionStartingPoint..<(predictionStartingPoint + numberOfClasses)])
+                        
+                        let prediction = argmaxDecoding(sampleOutputArray)
+                        let label = oneHotDecoding(predictionArray)
+                        
+                        if prediction == label {
+                            // TODO: Train Accuracy
+                        }
+                        
+                        print("\(i + (batch * batchSize)) -> Prediction: \(prediction) Label: \(label)")
+                    }
                 }
             }
         }
@@ -294,7 +317,7 @@ public class MNIST : ObservableObject {
         }
         
         let accuracy = Float(match) / Float(testingSample)
-        print("Accuracy = \(accuracy) %")
+        print("Test Accuracy = \(accuracy) %")
         
         modelTrained = true
     }
