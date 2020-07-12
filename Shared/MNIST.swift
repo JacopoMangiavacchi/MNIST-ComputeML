@@ -205,11 +205,11 @@ public class MNIST : ObservableObject {
                                                                                                  outputFeatureChannelCount: numberOfClasses))!,
                                sources: [relu1!])
 
-        graph.node(with: MLCSoftmaxLayer(operation: .softmax),
+        let outputSoftmax = graph.node(with: MLCSoftmaxLayer(operation: .softmax),
                    source: dense2!)
         
         let trainingGraph = MLCTrainingGraph(graphObjects: [graph],
-                                             lossLayer: MLCLossLayer(descriptor: MLCLossDescriptor(type: .categoricalCrossEntropy,
+                                             lossLayer: MLCLossLayer(descriptor: MLCLossDescriptor(type: .softmaxCrossEntropy,
                                                                                                    reductionType: .none)),
                                              optimizer: MLCAdamOptimizer(descriptor: MLCOptimizerDescriptor(learningRate: 0.001,
                                                                                                            gradientRescale: 1.0,
@@ -223,10 +223,17 @@ public class MNIST : ObservableObject {
         trainingGraph.addInputs(["image" : inputTensor],
                                 lossLabels: ["label" : lossLabelTensor])
         
+        let outputTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, numberOfClasses], dataType: .float32)!,
+                                     randomInitializerType: .glorotUniform)
+
+        trainingGraph.addOutputs(["output" : outputTensor])
+        
         trainingGraph.compile(options: [], device: device)
         
         // TRAINING LOOP
         for epoch in 0..<epochs {
+            var epochMatch = 0
+
             for batch in 0..<trainBatches {
                 let xData = trainingBatchProviderX!.withUnsafeBufferPointer { pointer in
                     MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!.advanced(by: batch * imageSize * batchSize),
@@ -246,11 +253,16 @@ public class MNIST : ObservableObject {
                     // VALIDATE
                     let bufferOutput = UnsafeMutableRawPointer.allocate(byteCount: batchSize * self.numberOfClasses * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
 
-                    r!.copyDataFromDeviceMemory(toBytes: bufferOutput, length: batchSize * self.numberOfClasses * MemoryLayout<Float>.size, synchronizeWithDevice: false)
+//                    r!.copyDataFromDeviceMemory(toBytes: bufferOutput, length: batchSize * self.numberOfClasses * MemoryLayout<Float>.size, synchronizeWithDevice: false)
+                    outputSoftmax!.copyDataFromDeviceMemory(toBytes: bufferOutput, length: batchSize * self.numberOfClasses * MemoryLayout<Float>.size, synchronizeWithDevice: false)
 
                     let float4Ptr = bufferOutput.bindMemory(to: Float.self, capacity: batchSize * self.numberOfClasses)
                     let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: batchSize * self.numberOfClasses)
                     let batchOutputArray = Array(float4Buffer)
+                    
+//                    let batchOutputArray = outputTensor.data!.withUnsafeBytes { (bytes: UnsafePointer<Float>) in
+//                        Array(UnsafeBufferPointer(start: bytes, count: batchSize * self.numberOfClasses))
+//                    }
 
                     for i in 0..<batchSize {
                         let batchStartingPoint = i * self.numberOfClasses
@@ -262,13 +274,16 @@ public class MNIST : ObservableObject {
                         let label = oneHotDecoding(predictionArray)
                         
                         if prediction == label {
-                            // TODO: Train Accuracy
+                            epochMatch += 1
                         }
                         
-                        print("\(i + (batch * batchSize)) -> Prediction: \(prediction) Label: \(label)")
+                        // print("\(i + (batch * batchSize)) -> Prediction: \(prediction) Label: \(label)")
                     }
                 }
             }
+            
+            let epochAccuracy = Float(epochMatch) / Float(trainingSample)
+            print("Epoch \(epoch) Accuracy = \(epochAccuracy) %")
         }
         
         // CREATE INFERENCE GRAPH REUSING TRAINING WEIGHTS/BIASES
@@ -311,7 +326,7 @@ public class MNIST : ObservableObject {
                         match += 1
                     }
                     
-                    print("\(i + (batch * batchSize)) -> Prediction: \(prediction) Label: \(label)")
+                    // print("\(i + (batch * batchSize)) -> Prediction: \(prediction) Label: \(label)")
                 }
             }
         }
