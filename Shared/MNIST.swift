@@ -20,9 +20,9 @@ public class MNIST : ObservableObject {
     @Published public var trainingBatchCount = 0
     @Published public var predictionBatchCount = 0
     @Published public var trainingBatchProviderX: [Float]?
-    @Published public var trainingBatchProviderY: [Int64]?
+    @Published public var trainingBatchProviderY: [Float]?
     @Published public var predictionBatchProviderX: [Float]?
-    @Published public var predictionBatchProviderY: [Int64]?
+    @Published public var predictionBatchProviderY: [Float]?
     @Published public var modelTrained = false
     @Published public var epochs: Int = 5
     
@@ -46,22 +46,22 @@ public class MNIST : ObservableObject {
         }
     }
     
-    private func oneHotEncoding(_ number: Int64, length: Int = 10) -> [Int64] {
+    private func oneHotEncoding(_ number: Int, length: Int = 10) -> [Float] {
         guard number < length else {
             fatalError("wrong ordinal vs encoding length")
         }
         
-        var array = Array<Int64>(repeating: 0, count: length)
-        array[Int(number)] = 1
+        var array = Array<Float>(repeating: 0.0, count: length)
+        array[number] = 1.0
         return array
     }
     
-    private func oneHotDecoding(_ encoding: [Int64]) -> Int64 {
-        var value: Int64 = 0
+    private func oneHotDecoding(_ encoding: [Float]) -> Int {
+        var value: Int = 0
         
         for i in 0..<encoding.count {
             if encoding[i] == 1 {
-                value = Int64(i)
+                value = i
                 break
             }
         }
@@ -69,21 +69,21 @@ public class MNIST : ObservableObject {
         return value
     }
     
-    private func argmaxDecoding(_ encoding: [Float]) -> Int64 {
+    private func argmaxDecoding(_ encoding: [Float]) -> Int {
         var max: Float = 0
-        var pos: Int64 = 0
+        var pos: Int = 0
         
         for i in 0..<encoding.count {
             if encoding[i] > max {
                 max = encoding[i]
-                pos = Int64(i)
+                pos = i
             }
         }
         
         return pos
     }
     
-    private func readDataSet(fileName: String, updateStatus: @escaping (Int) -> Void) -> ([Float], [Int64]) { //}(MLCTensor, MLCTensor) {
+    private func readDataSet(fileName: String, updateStatus: @escaping (Int) -> Void) -> ([Float], [Float]) { //}(MLCTensor, MLCTensor) {
         guard let filePath = Bundle.main.path(forResource: fileName, ofType: "csv") else {
             fatalError("CSV file not found")
         }
@@ -92,7 +92,7 @@ public class MNIST : ObservableObject {
         
         var count = 0
         var X = [Float]()
-        var Y = [Int64]()
+        var Y = [Float]()
         
         let iterations = 20
         var iteration = 0
@@ -105,7 +105,7 @@ public class MNIST : ObservableObject {
         
         DispatchQueue.concurrentPerform(iterations: iterations) { iteration in
             for line in iterationList[iteration] {
-                let sample = line.split(separator: ",").compactMap({Int64($0)})
+                let sample = line.split(separator: ",").compactMap({Int($0)})
 
                 serialQueue.sync {
                     Y.append(contentsOf: oneHotEncoding(sample[0]))
@@ -173,7 +173,7 @@ public class MNIST : ObservableObject {
         let device = MLCDevice(type: .cpu)!
 
         let inputTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, imageSize, 1, 1], dataType: .float32)!)
-        let lossLabelTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, numberOfClasses], dataType: .int64)!)
+        let lossLabelTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, numberOfClasses], dataType: .float32)!)
         
         let dense1WeightsTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, imageSize*dense1LayerOutputSize, 1, 1], dataType: .float32)!,
                                             randomInitializerType: .glorotUniform)
@@ -210,7 +210,7 @@ public class MNIST : ObservableObject {
         
         let trainingGraph = MLCTrainingGraph(graphObjects: [graph],
                                              lossLayer: MLCLossLayer(descriptor: MLCLossDescriptor(type: .softmaxCrossEntropy,
-                                                                                                   reductionType: .none)),
+                                                                                                   reductionType: .mean)),
                                              optimizer: MLCAdamOptimizer(descriptor: MLCOptimizerDescriptor(learningRate: 0.001,
                                                                                                            gradientRescale: 1.0,
                                                                                                         regularizationType: .none,
@@ -223,10 +223,10 @@ public class MNIST : ObservableObject {
         trainingGraph.addInputs(["image" : inputTensor],
                                 lossLabels: ["label" : lossLabelTensor])
         
-        let outputTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, numberOfClasses], dataType: .float32)!,
-                                     randomInitializerType: .glorotUniform)
-
-        trainingGraph.addOutputs(["output" : outputTensor])
+//        let outputTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, numberOfClasses], dataType: .float32)!,
+//                                     randomInitializerType: .glorotUniform)
+//
+//        trainingGraph.addOutputs(["output" : outputTensor])
         
         trainingGraph.compile(options: [], device: device)
         
