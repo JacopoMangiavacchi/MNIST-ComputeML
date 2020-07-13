@@ -119,8 +119,8 @@
 			children = (
 				EA91928724A8B0F600D8F292 /* MNIST_ComputeMLApp.swift */,
 				EA9192C424A8B28100D8F292 /* MNIST.swift */,
-				EA9192C724A8B35A00D8F292 /* DrawView.swift */,
 				EA91928824A8B0F600D8F292 /* ContentView.swift */,
+				EA9192C724A8B35A00D8F292 /* DrawView.swift */,
 				EA91928924A8B0F600D8F292 /* Assets.xcassets */,
 			);
 			path = Shared;

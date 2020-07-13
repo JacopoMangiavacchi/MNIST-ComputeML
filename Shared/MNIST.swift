@@ -23,6 +23,8 @@ public class MNIST : ObservableObject {
     @Published public var trainingBatchProviderY: [Float]?
     @Published public var predictionBatchProviderX: [Float]?
     @Published public var predictionBatchProviderY: [Float]?
+    @Published public var dataPreparing = false
+    @Published public var modelTraining = false
     @Published public var modelTrained = false
     @Published public var epochs: Int = 5
     
@@ -120,8 +122,13 @@ public class MNIST : ObservableObject {
         return (X, Y)
     }
         
-    public func asyncPrepareTrainBatchProvider() {
+    public func asyncPrepareData() {
         self.trainingBatchCount = 0
+        self.predictionBatchCount = 0
+        self.dataPreparing = true
+        var trainPrepared = false
+        var testPrepared = false
+
         concurrentQueue.async {
             let (X, Y) = self.readDataSet(fileName: "mnist_train") { count in
                 DispatchQueue.main.async {
@@ -133,12 +140,14 @@ public class MNIST : ObservableObject {
                 self.trainingBatchCount = X.count / self.imageSize
                 self.trainingBatchProviderX = X
                 self.trainingBatchProviderY = Y
+                
+                trainPrepared = true
+                if testPrepared {
+                    self.dataPreparing = false
+                }
             }
         }
-    }
-    
-    public func asyncPreparePredictionBatchProvider() {
-        self.predictionBatchCount = 0
+
         concurrentQueue.async {
             let (X, Y) = self.readDataSet(fileName: "mnist_test") { count in
                 DispatchQueue.main.async {
@@ -150,11 +159,16 @@ public class MNIST : ObservableObject {
                 self.predictionBatchCount = X.count / self.imageSize
                 self.predictionBatchProviderX = X
                 self.predictionBatchProviderY = Y
+
+                testPrepared = true
+                if trainPrepared {
+                    self.dataPreparing = false
+                }
             }
         }
     }
     
-    public func trainGraph() {
+    private func trainGraph() {
         // MODEL
         // -----
         // model = keras.Sequential([
@@ -333,7 +347,20 @@ public class MNIST : ObservableObject {
         
         let accuracy = Float(match) / Float(testingSample)
         print("Test Accuracy = \(accuracy) %")
-        
-        modelTrained = true
+    }
+    
+    public func asyncTrainGraph() {
+        self.modelTraining = true
+        self.modelTrained = false
+
+        concurrentQueue.async {
+            self.trainGraph()
+            
+            DispatchQueue.main.async {
+                self.modelTraining = false
+                self.modelTrained = true
+
+            }
+        }
     }
 }

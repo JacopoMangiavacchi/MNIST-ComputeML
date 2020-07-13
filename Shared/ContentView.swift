@@ -32,11 +32,10 @@ struct ContentView: View {
                                 ProgressView("Test: \(self.mnist.predictionBatchCount)", value: Float(self.mnist.predictionBatchCount), total: Float(self.mnist.expectedTestingSamples))
                                 Spacer(minLength: 10.0)
                                 Button(action: {
-                                    self.mnist.asyncPrepareTrainBatchProvider()
-                                    self.mnist.asyncPreparePredictionBatchProvider()
+                                    self.mnist.asyncPrepareData()
                                 }) {
                                     Text("Prep")
-                                }
+                                }.disabled(self.mnist.dataPreparing || self.mnist.modelTraining)
                             }
                         }
                         Section(header: Text("Training")) {
@@ -45,24 +44,12 @@ struct ContentView: View {
                                 Text("Train the model")
                                 Spacer()
                                 Button(action: {
-                                    self.mnist.trainGraph()
+                                    self.mnist.asyncTrainGraph()
                                 }) {
                                     Text("Train")
-                                }.disabled(!self.isDataReady(trainingCount: self.mnist.trainingBatchCount, predictionCount: self.mnist.predictionBatchCount))
+                                }.disabled(self.mnist.dataPreparing || self.mnist.modelTraining || !self.isDataReady(trainingCount: self.mnist.trainingBatchCount, predictionCount: self.mnist.predictionBatchCount))
                             }
                         }
-//                        Section(header: Text("Validation")) {
-//                            HStack {
-//                                Text("Predict Test data")
-//                                Spacer()
-//                                Button(action: {
-//                                    self.mnist.testModel()
-//                                }) {
-//                                    Text("Start")
-//                                }.disabled(!self.isDataReady(for: self.mnist.predictionBatchStatus) || !self.mnist.modelTrained)
-//                            }
-//                            Text(self.mnist.accuracy)
-//                        }
                         Section(header: Text("Test")) {
                             HStack {
                                 Button(action: {}) {
