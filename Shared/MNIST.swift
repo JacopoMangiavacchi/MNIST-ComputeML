@@ -32,6 +32,7 @@ public class MNIST : ObservableObject {
     let batchSize = 25
     var device: MLCDevice!
     var graph: MLCGraph!
+    var trainingGraph: MLCTrainingGraph!
     var inferenceGraph: MLCInferenceGraph!
     var inputTensor: MLCTensor!
     var dense1WeightsTensor: MLCTensor!
@@ -238,7 +239,7 @@ public class MNIST : ObservableObject {
         outputSoftmax = graph.node(with: MLCSoftmaxLayer(operation: .softmax),
                    source: dense2!)
         
-        let trainingGraph = MLCTrainingGraph(graphObjects: [graph],
+        trainingGraph = MLCTrainingGraph(graphObjects: [graph],
                                              lossLayer: MLCLossLayer(descriptor: MLCLossDescriptor(type: .softmaxCrossEntropy,
                                                                                                    reductionType: .mean)),
                                              optimizer: MLCAdamOptimizer(descriptor: MLCOptimizerDescriptor(learningRate: 0.001,
@@ -395,22 +396,24 @@ public class MNIST : ObservableObject {
                           length: batchSize * imageSize * MemoryLayout<Float>.size)
         }
         
+        var prediction = -1
         inferenceGraph.execute(inputsData: ["image" : xData],
                               batchSize: batchSize,
                               options: [.synchronous]) { [self] (r, e, time) in
-            let bufferOutput = UnsafeMutableRawPointer.allocate(byteCount: numberOfClasses * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
+            let bufferOutput = UnsafeMutableRawPointer.allocate(byteCount: batchSize * numberOfClasses * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
 
-            r!.copyDataFromDeviceMemory(toBytes: bufferOutput, length: numberOfClasses * MemoryLayout<Float>.size, synchronizeWithDevice: false)
+            r!.copyDataFromDeviceMemory(toBytes: bufferOutput, length: batchSize * numberOfClasses * MemoryLayout<Float>.size, synchronizeWithDevice: false)
 
-            let float4Ptr = bufferOutput.bindMemory(to: Float.self, capacity: numberOfClasses)
-            let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: numberOfClasses)
+            let float4Ptr = bufferOutput.bindMemory(to: Float.self, capacity: batchSize * numberOfClasses)
+            let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: batchSize * numberOfClasses)
             let batchOutputArray = Array(float4Buffer)
+            let firstImageOutput = Array(batchOutputArray[0..<numberOfClasses])
 
-            let prediction = argmaxDecoding(batchOutputArray)
+            prediction = argmaxDecoding(firstImageOutput)
 
             print(prediction)
         }
         
-        return 7
+        return prediction
     }
 }
