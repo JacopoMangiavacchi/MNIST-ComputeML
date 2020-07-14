@@ -30,6 +30,8 @@ public class MNIST : ObservableObject {
     @Published public var epochs: Int = 5
     
     let batchSize = 25
+    let dense1LayerOutputSize = 128
+
     var device: MLCDevice!
     var graph: MLCGraph!
     var trainingGraph: MLCTrainingGraph!
@@ -185,23 +187,9 @@ public class MNIST : ObservableObject {
         }
     }
     
-    private func trainGraph(log: (String) -> Void) {
-        // MODEL
-        // -----
-        // model = keras.Sequential([
-        //     keras.layers.Dense(128, activation='relu'),  // W (784, 128)  B (128,)
-        //     keras.layers.Dense(10)                       // W (128, 10)   B (10,)
-        // ])
-        
-        let trainingSample = trainingDataX!.count / imageSize
-        let testingSample = testDataX!.count / imageSize
-        let trainingBatches = trainingSample / batchSize
-        let testingBatches = testingSample / batchSize
-
-        let dense1LayerOutputSize = 128
-
+    private func initializeTensors() {
         device = MLCDevice(type: .cpu)!
-
+        
         inputTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, imageSize, 1, 1], dataType: .float32)!)
         
         dense1WeightsTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, imageSize*dense1LayerOutputSize, 1, 1], dataType: .float32)!,
@@ -214,9 +202,9 @@ public class MNIST : ObservableObject {
                                            randomInitializerType: .glorotUniform)
 
         lossLabelTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, numberOfClasses], dataType: .float32)!)
-
-        // CREATE TRAINING GRAPH
-
+    }
+    
+    private func buildGraph() {
         graph = MLCGraph()
         
         dense1 = graph.node(with: MLCFullyConnectedLayer(weights: dense1WeightsTensor,
@@ -254,14 +242,13 @@ public class MNIST : ObservableObject {
         trainingGraph.addInputs(["image" : inputTensor],
                                 lossLabels: ["label" : lossLabelTensor])
         
-//        let outputTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, numberOfClasses], dataType: .float32)!,
-//                                     randomInitializerType: .glorotUniform)
-//
-//        trainingGraph.addOutputs(["output" : outputTensor])
-        
         trainingGraph.compile(options: [], device: device)
-        
-        // TRAINING LOOP
+    }
+    
+    private func execTrainingLoop(log: (String) -> Void) {
+        let trainingSample = trainingDataX!.count / imageSize
+        let trainingBatches = trainingSample / batchSize
+
         for epoch in 0..<epochs {
             var epochMatch = 0
 
@@ -316,8 +303,13 @@ public class MNIST : ObservableObject {
             let epochAccuracy = Float(epochMatch) / Float(trainingSample)
             log("Epoch \(epoch) Accuracy = \(epochAccuracy) %")
         }
+    }
+    
+    private func evaluateGraph(log: (String) -> Void) {
+        let testingSample = testDataX!.count / imageSize
+        let testingBatches = testingSample / batchSize
+
         
-        // CREATE INFERENCE GRAPH REUSING TRAINING WEIGHTS/BIASES
         inferenceGraph = MLCInferenceGraph(graphObjects: [graph])
         inferenceGraph.addInputs(["image" : inputTensor])
         inferenceGraph.compile(options: [], device: device)
@@ -364,6 +356,23 @@ public class MNIST : ObservableObject {
         
         let accuracy = Float(match) / Float(testingSample)
         log("Test Accuracy = \(accuracy) %")
+    }
+    
+    private func trainGraph(log: (String) -> Void) {
+        // MODEL
+        // -----
+        // model = keras.Sequential([
+        //     keras.layers.Dense(128, activation='relu'),  // W (784, 128)  B (128,)
+        //     keras.layers.Dense(10)                       // W (128, 10)   B (10,)
+        // ])
+
+        initializeTensors()
+        
+        buildGraph()
+        
+        execTrainingLoop(log: log)
+
+        evaluateGraph(log: log)
     }
     
     public func asyncTrainGraph() {
