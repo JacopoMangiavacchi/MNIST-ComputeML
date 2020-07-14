@@ -29,7 +29,7 @@ public class MNIST : ObservableObject {
     @Published public var trainingFeedback = "Train the model"
     @Published public var epochs: Int = 5
     
-    let batchSize = 25
+    let batchSize = 32
     let dense1LayerOutputSize = 128
 
     var device: MLCDevice!
@@ -226,17 +226,19 @@ public class MNIST : ObservableObject {
 
         outputSoftmax = graph.node(with: MLCSoftmaxLayer(operation: .softmax),
                    source: dense2!)
-        
+    }
+    
+    private func buildTrainingGraph() {
         trainingGraph = MLCTrainingGraph(graphObjects: [graph],
                                              lossLayer: MLCLossLayer(descriptor: MLCLossDescriptor(type: .softmaxCrossEntropy,
                                                                                                    reductionType: .mean)),
                                              optimizer: MLCAdamOptimizer(descriptor: MLCOptimizerDescriptor(learningRate: 0.001,
                                                                                                            gradientRescale: 1.0,
                                                                                                         regularizationType: .none,
-                                                                                                        regularizationScale: 0.8),
+                                                                                                        regularizationScale: 0.0),
                                                                          beta1: 0.9,
                                                                          beta2: 0.999,
-                                                                         epsilon: 1e-8,
+                                                                         epsilon: 1e-7,
                                                                          timeStep: 1))
 
         trainingGraph.addInputs(["image" : inputTensor],
@@ -369,6 +371,8 @@ public class MNIST : ObservableObject {
         initializeTensors()
         
         buildGraph()
+        
+        buildTrainingGraph()
         
         execTrainingLoop(log: log)
 
