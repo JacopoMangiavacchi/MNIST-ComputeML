@@ -41,7 +41,7 @@ struct ContentView: View {
                         Section(header: Text("Training")) {
                             Stepper(value: self.$mnist.epochs, in: 1...20, label: { Text("Epoch:  \(self.mnist.epochs)")})
                             HStack {
-                                Text("Train the model")
+                                Text(self.mnist.trainingFeedback)
                                 Spacer()
                                 Button(action: {
                                     self.mnist.asyncTrainGraph()

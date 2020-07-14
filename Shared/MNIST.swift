@@ -26,6 +26,7 @@ public class MNIST : ObservableObject {
     @Published public var dataPreparing = false
     @Published public var modelTraining = false
     @Published public var modelTrained = false
+    @Published public var trainingFeedback = "Train the model"
     @Published public var epochs: Int = 5
     
     // Load in memory and split is not performant
@@ -168,7 +169,7 @@ public class MNIST : ObservableObject {
         }
     }
     
-    private func trainGraph() {
+    private func trainGraph(log: (String) -> Void) {
         // MODEL
         // -----
         // model = keras.Sequential([
@@ -297,7 +298,7 @@ public class MNIST : ObservableObject {
             }
             
             let epochAccuracy = Float(epochMatch) / Float(trainingSample)
-            print("Epoch \(epoch) Accuracy = \(epochAccuracy) %")
+            log("Epoch \(epoch) Accuracy = \(epochAccuracy) %")
         }
         
         // CREATE INFERENCE GRAPH REUSING TRAINING WEIGHTS/BIASES
@@ -346,7 +347,7 @@ public class MNIST : ObservableObject {
         }
         
         let accuracy = Float(match) / Float(testingSample)
-        print("Test Accuracy = \(accuracy) %")
+        log("Test Accuracy = \(accuracy) %")
     }
     
     public func asyncTrainGraph() {
@@ -354,12 +355,16 @@ public class MNIST : ObservableObject {
         self.modelTrained = false
 
         concurrentQueue.async {
-            self.trainGraph()
+            self.trainGraph{ logText in
+                print(logText)
+                DispatchQueue.main.async {
+                    self.trainingFeedback = logText
+                }
+            }
             
             DispatchQueue.main.async {
                 self.modelTraining = false
                 self.modelTrained = true
-
             }
         }
     }
