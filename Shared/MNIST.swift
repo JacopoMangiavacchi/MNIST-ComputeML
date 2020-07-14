@@ -18,17 +18,32 @@ public class MNIST : ObservableObject {
     let concurrentQueue = DispatchQueue(label: "MNIST.concurrent.queue", attributes: .concurrent)
 
     @Published public var trainingBatchCount = 0
-    @Published public var predictionBatchCount = 0
-    @Published public var trainingBatchProviderX: [Float]?
-    @Published public var trainingBatchProviderY: [Float]?
-    @Published public var predictionBatchProviderX: [Float]?
-    @Published public var predictionBatchProviderY: [Float]?
+    @Published public var testBatchCount = 0
+    @Published public var trainingDataX: [Float]?
+    @Published public var trainingDataY: [Float]?
+    @Published public var testDataX: [Float]?
+    @Published public var testDataY: [Float]?
     @Published public var dataPreparing = false
     @Published public var modelTraining = false
     @Published public var modelTrained = false
     @Published public var trainingFeedback = "Train the model"
     @Published public var epochs: Int = 5
     
+    let batchSize = 25
+    var device: MLCDevice!
+    var graph: MLCGraph!
+    var inferenceGraph: MLCInferenceGraph!
+    var inputTensor: MLCTensor!
+    var dense1WeightsTensor: MLCTensor!
+    var dense1BiasesTensor: MLCTensor!
+    var dense2WeightsTensor: MLCTensor!
+    var dense2BiasesTensor: MLCTensor!
+    var dense1: MLCTensor!
+    var relu1: MLCTensor!
+    var dense2: MLCTensor!
+    var outputSoftmax: MLCTensor!
+    var lossLabelTensor: MLCTensor!
+
     // Load in memory and split is not performant
     private func getFileLine(filePath: String, process: (String) -> Void) {
         guard let filePointer:UnsafeMutablePointer<FILE> = fopen(filePath,"r") else {
@@ -124,9 +139,9 @@ public class MNIST : ObservableObject {
     }
         
     public func asyncPrepareData() {
-        self.trainingBatchCount = 0
-        self.predictionBatchCount = 0
-        self.dataPreparing = true
+        trainingBatchCount = 0
+        testBatchCount = 0
+        dataPreparing = true
         var trainPrepared = false
         var testPrepared = false
 
@@ -139,8 +154,8 @@ public class MNIST : ObservableObject {
             
             DispatchQueue.main.async {
                 self.trainingBatchCount = X.count / self.imageSize
-                self.trainingBatchProviderX = X
-                self.trainingBatchProviderY = Y
+                self.trainingDataX = X
+                self.trainingDataY = Y
                 
                 trainPrepared = true
                 if testPrepared {
@@ -152,14 +167,14 @@ public class MNIST : ObservableObject {
         concurrentQueue.async {
             let (X, Y) = self.readDataSet(fileName: "mnist_test") { count in
                 DispatchQueue.main.async {
-                    self.predictionBatchCount = count
+                    self.testBatchCount = count
                 }
             }
             
             DispatchQueue.main.async {
-                self.predictionBatchCount = X.count / self.imageSize
-                self.predictionBatchProviderX = X
-                self.predictionBatchProviderY = Y
+                self.testBatchCount = X.count / self.imageSize
+                self.testDataX = X
+                self.testDataY = Y
 
                 testPrepared = true
                 if trainPrepared {
@@ -177,50 +192,50 @@ public class MNIST : ObservableObject {
         //     keras.layers.Dense(10)                       // W (128, 10)   B (10,)
         // ])
         
-        let batchSize = 25
-        let trainingSample = trainingBatchProviderX!.count / imageSize
-        let testingSample = predictionBatchProviderX!.count / imageSize
-        let trainBatches = trainingSample / batchSize
+        let trainingSample = trainingDataX!.count / imageSize
+        let testingSample = testDataX!.count / imageSize
+        let trainingBatches = trainingSample / batchSize
         let testingBatches = testingSample / batchSize
 
         let dense1LayerOutputSize = 128
 
-        let device = MLCDevice(type: .cpu)!
+        device = MLCDevice(type: .cpu)!
 
-        let inputTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, imageSize, 1, 1], dataType: .float32)!)
-        let lossLabelTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, numberOfClasses], dataType: .float32)!)
+        inputTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, imageSize, 1, 1], dataType: .float32)!)
         
-        let dense1WeightsTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, imageSize*dense1LayerOutputSize, 1, 1], dataType: .float32)!,
+        dense1WeightsTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, imageSize*dense1LayerOutputSize, 1, 1], dataType: .float32)!,
                                             randomInitializerType: .glorotUniform)
-        let dense1BiasesTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, dense1LayerOutputSize, 1, 1], dataType: .float32)!,
+        dense1BiasesTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, dense1LayerOutputSize, 1, 1], dataType: .float32)!,
                                            randomInitializerType: .glorotUniform)
-        let dense2WeightsTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, dense1LayerOutputSize*numberOfClasses, 1, 1], dataType: .float32)!,
+        dense2WeightsTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, dense1LayerOutputSize*numberOfClasses, 1, 1], dataType: .float32)!,
                                             randomInitializerType: .glorotUniform)
-        let dense2BiasesTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, numberOfClasses, 1, 1], dataType: .float32)!,
+        dense2BiasesTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [1, numberOfClasses, 1, 1], dataType: .float32)!,
                                            randomInitializerType: .glorotUniform)
+
+        lossLabelTensor = MLCTensor(descriptor: MLCTensorDescriptor(shape: [batchSize, numberOfClasses], dataType: .float32)!)
 
         // CREATE TRAINING GRAPH
 
-        let graph = MLCGraph()
-
-        let dense1 = graph.node(with: MLCFullyConnectedLayer(weights: dense1WeightsTensor,
+        graph = MLCGraph()
+        
+        dense1 = graph.node(with: MLCFullyConnectedLayer(weights: dense1WeightsTensor,
                                                             biases: dense1BiasesTensor,
                                                             descriptor: MLCConvolutionDescriptor(kernelSizes: (height: imageSize, width: dense1LayerOutputSize),
                                                                                                  inputFeatureChannelCount: imageSize,
                                                                                                  outputFeatureChannelCount: dense1LayerOutputSize))!,
                                sources: [inputTensor])
         
-        let relu1 = graph.node(with: MLCActivationLayer(descriptor: MLCActivationDescriptor(type: MLCActivationType.relu)!),
+        relu1 = graph.node(with: MLCActivationLayer(descriptor: MLCActivationDescriptor(type: MLCActivationType.relu)!),
                    source: dense1!)
 
-        let dense2 = graph.node(with: MLCFullyConnectedLayer(weights: dense2WeightsTensor,
+        dense2 = graph.node(with: MLCFullyConnectedLayer(weights: dense2WeightsTensor,
                                                             biases: dense2BiasesTensor,
                                                             descriptor: MLCConvolutionDescriptor(kernelSizes: (height: dense1LayerOutputSize, width: numberOfClasses),
                                                                                                  inputFeatureChannelCount: dense1LayerOutputSize,
                                                                                                  outputFeatureChannelCount: numberOfClasses))!,
                                sources: [relu1!])
 
-        let outputSoftmax = graph.node(with: MLCSoftmaxLayer(operation: .softmax),
+        outputSoftmax = graph.node(with: MLCSoftmaxLayer(operation: .softmax),
                    source: dense2!)
         
         let trainingGraph = MLCTrainingGraph(graphObjects: [graph],
@@ -249,13 +264,13 @@ public class MNIST : ObservableObject {
         for epoch in 0..<epochs {
             var epochMatch = 0
 
-            for batch in 0..<trainBatches {
-                let xData = trainingBatchProviderX!.withUnsafeBufferPointer { pointer in
+            for batch in 0..<trainingBatches {
+                let xData = trainingDataX!.withUnsafeBufferPointer { pointer in
                     MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!.advanced(by: batch * imageSize * batchSize),
                                   length: batchSize * imageSize * MemoryLayout<Float>.size)
                 }
 
-                let yData = trainingBatchProviderY!.withUnsafeBufferPointer { pointer in
+                let yData = trainingDataY!.withUnsafeBufferPointer { pointer in
                     MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!.advanced(by: batch * numberOfClasses * batchSize),
                                   length: batchSize * numberOfClasses * MemoryLayout<Int>.size)
                 }
@@ -283,7 +298,7 @@ public class MNIST : ObservableObject {
                         let batchStartingPoint = i * self.numberOfClasses
                         let predictionStartingPoint = (i * self.numberOfClasses) + (batch * batchSize * numberOfClasses)
                         let sampleOutputArray = Array(batchOutputArray[batchStartingPoint..<(batchStartingPoint + self.numberOfClasses)])
-                        let predictionArray = Array(trainingBatchProviderY![predictionStartingPoint..<(predictionStartingPoint + numberOfClasses)])
+                        let predictionArray = Array(trainingDataY![predictionStartingPoint..<(predictionStartingPoint + numberOfClasses)])
                         
                         let prediction = argmaxDecoding(sampleOutputArray)
                         let label = oneHotDecoding(predictionArray)
@@ -302,7 +317,7 @@ public class MNIST : ObservableObject {
         }
         
         // CREATE INFERENCE GRAPH REUSING TRAINING WEIGHTS/BIASES
-        let inferenceGraph = MLCInferenceGraph(graphObjects: [graph])
+        inferenceGraph = MLCInferenceGraph(graphObjects: [graph])
         inferenceGraph.addInputs(["image" : inputTensor])
         inferenceGraph.compile(options: [], device: device)
 
@@ -310,7 +325,7 @@ public class MNIST : ObservableObject {
         var match = 0
         
         for batch in 0..<testingBatches {
-            let xData = predictionBatchProviderX!.withUnsafeBufferPointer { pointer in
+            let xData = testDataX!.withUnsafeBufferPointer { pointer in
                 MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!.advanced(by: batch * imageSize * batchSize),
                               length: batchSize * imageSize * MemoryLayout<Float>.size)
             }
@@ -332,7 +347,7 @@ public class MNIST : ObservableObject {
                     let batchStartingPoint = i * numberOfClasses
                     let predictionStartingPoint = (i * numberOfClasses) + (batch * batchSize * numberOfClasses)
                     let sampleOutputArray = Array(batchOutputArray[batchStartingPoint..<(batchStartingPoint + numberOfClasses)])
-                    let predictionArray = Array(predictionBatchProviderY![predictionStartingPoint..<(predictionStartingPoint + numberOfClasses)])
+                    let predictionArray = Array(testDataY![predictionStartingPoint..<(predictionStartingPoint + numberOfClasses)])
                     
                     let prediction = argmaxDecoding(sampleOutputArray)
                     let label = oneHotDecoding(predictionArray)
@@ -351,9 +366,10 @@ public class MNIST : ObservableObject {
     }
     
     public func asyncTrainGraph() {
-        self.modelTraining = true
-        self.modelTrained = false
-
+        modelTraining = true
+        modelTrained = false
+        trainingFeedback = "Training.."
+        
         concurrentQueue.async {
             self.trainGraph{ logText in
                 print(logText)
@@ -367,5 +383,34 @@ public class MNIST : ObservableObject {
                 self.modelTrained = true
             }
         }
+    }
+    
+    public func predict(data: [[Float]]) -> Int {
+        var image: [Float] = Array(data.joined())
+        image.append(contentsOf: Array<Float>(repeating: 0.0, count: (batchSize - 1) * imageSize))
+        
+        
+        let xData = image.withUnsafeBufferPointer { pointer in
+            MLCTensorData(immutableBytesNoCopy: pointer.baseAddress!,
+                          length: batchSize * imageSize * MemoryLayout<Float>.size)
+        }
+        
+        inferenceGraph.execute(inputsData: ["image" : xData],
+                              batchSize: batchSize,
+                              options: [.synchronous]) { [self] (r, e, time) in
+            let bufferOutput = UnsafeMutableRawPointer.allocate(byteCount: numberOfClasses * MemoryLayout<Float>.size, alignment: MemoryLayout<Float>.alignment)
+
+            r!.copyDataFromDeviceMemory(toBytes: bufferOutput, length: numberOfClasses * MemoryLayout<Float>.size, synchronizeWithDevice: false)
+
+            let float4Ptr = bufferOutput.bindMemory(to: Float.self, capacity: numberOfClasses)
+            let float4Buffer = UnsafeBufferPointer(start: float4Ptr, count: numberOfClasses)
+            let batchOutputArray = Array(float4Buffer)
+
+            let prediction = argmaxDecoding(batchOutputArray)
+
+            print(prediction)
+        }
+        
+        return 7
     }
 }

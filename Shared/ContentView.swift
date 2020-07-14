@@ -22,19 +22,19 @@ struct ContentView: View {
     
     var body: some View {
         GeometryReader { geometry in
-            //NavigationView {
+            NavigationView {
                 VStack(spacing: 0) {
                     Form {
                         Section(header: Text("Dataset")) {
                             HStack {
                                 ProgressView("Training: \(self.mnist.trainingBatchCount)", value: Float(self.mnist.trainingBatchCount), total: Float(self.mnist.expextedTrainingSamples))
                                 Spacer(minLength: 10.0)
-                                ProgressView("Test: \(self.mnist.predictionBatchCount)", value: Float(self.mnist.predictionBatchCount), total: Float(self.mnist.expectedTestingSamples))
+                                ProgressView("Test: \(self.mnist.testBatchCount)", value: Float(self.mnist.testBatchCount), total: Float(self.mnist.expectedTestingSamples))
                                 Spacer(minLength: 10.0)
                                 Button(action: {
                                     self.mnist.asyncPrepareData()
                                 }) {
-                                    Text("Prep")
+                                    Text("Prepare")
                                 }.disabled(self.mnist.dataPreparing || self.mnist.modelTraining)
                             }
                         }
@@ -47,7 +47,7 @@ struct ContentView: View {
                                     self.mnist.asyncTrainGraph()
                                 }) {
                                     Text("Train")
-                                }.disabled(self.mnist.dataPreparing || self.mnist.modelTraining || !self.isDataReady(trainingCount: self.mnist.trainingBatchCount, predictionCount: self.mnist.predictionBatchCount))
+                                }.disabled(self.mnist.dataPreparing || self.mnist.modelTraining || !self.isDataReady(trainingCount: self.mnist.trainingBatchCount, predictionCount: self.mnist.testBatchCount))
                             }
                         }
                         Section(header: Text("Test")) {
@@ -67,7 +67,7 @@ struct ContentView: View {
                                     .disabled(!self.mnist.modelTrained)
                                     .onTapGesture {
                                         let data = self.drawData.view.getImageData()
-                                        // self.prediction = "\(self.mnist.predict(data: data))"
+                                        self.prediction = "\(self.mnist.predict(data: data))"
                                     }
                             }
                         }
@@ -78,8 +78,8 @@ struct ContentView: View {
                         .frame(width: geometry.size.height * self.splitRatio, height: geometry.size.height * self.splitRatio)
                         .border(Color.blue, width: 1)
                 }
-//                .navigationBarTitle("MNIST MLCompute", displayMode: .inline)
-//            }
+                .navigationBarTitle("MNIST MLCompute", displayMode: .inline)
+            }
         }
     }
 }
